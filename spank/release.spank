@@ -1,0 +1,4 @@
+include         spank/common.inc
+cflags          O3
+postbuildscript "$(host_dash)strip $(target)"
+postbuildscript "echo built RELEASE version"

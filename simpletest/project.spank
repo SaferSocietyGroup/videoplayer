@@ -1,0 +1,18 @@
+target_platform	mingw32
+name            simpletest
+
+template        c++11
+cflags          gstabs
+sourcedir       ../src .
+cflags		std=c++0x Wall Wno-deprecated-declarations O3 I../src
+
+lib-static	libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl
+
+ldflags         mconsole 
+
+# link statically
+ldflags         static-libgcc "Wl,-Bstatic"
+
+
+exclude ../src/main.cpp
+exclude ../src/player.cpp
