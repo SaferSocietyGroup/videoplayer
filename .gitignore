@@ -1,4 +1,5 @@
 *.exe
+*.nupkg
 *.avi
 *.flv
 *.mp4
