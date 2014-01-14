@@ -9,6 +9,6 @@
   </metadata>
   <files>
     <file src="NetCleanVideoPlayer.exe" target="CopyToOutput/always" />
-    <file src="dummy.txt" target="lib" />
+    <file src="dummy.txt" target="lib" />
   </files>
 </package>
