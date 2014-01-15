@@ -50,6 +50,7 @@ class Video
 {
 	public:
 	enum Error {
+		// proper errors
 		ENoError,
 		EFile,
 		EVideoCodec,
@@ -58,7 +59,10 @@ class Video
 		EDemuxing,
 		EDecoding,
 		ESeeking,
-		EEof
+
+		// messages rather than errors (TODO: rename enum / callback?)
+		EEof,
+		EUnloadedFile
 	};
 	
 	typedef std::function<void(Error, const std::string&)> ErrorCallback;

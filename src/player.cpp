@@ -208,7 +208,10 @@ void Player::Run(IPC& ipc)
 				video = Video::Create(message, 
 					// error handler
 					[&](Video::Error error, const std::string& msg){
-						ipc.WriteMessage(error == Video::EEof ? "eof" : "error", message);
+						if(error < Video::EEof)
+							ipc.WriteMessage("error", message);
+						else
+							ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", message);
 					},
 					// audio handler
 					[&](const Sample* buffer, int size){

@@ -964,6 +964,8 @@ class CVideo : public Video
 
 		if(pFormatCtx)
 			av_close_input_file(pFormatCtx);
+
+		errorCallback(EUnloadedFile, filename);
 	}
 
 	bool IsEof(){
