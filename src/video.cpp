@@ -1060,7 +1060,7 @@ VideoPtr Video::Create(const std::string& filename, ErrorCallback errorCallback,
 	av_log_set_callback(logCb);
 	av_log_set_level(AV_LOG_WARNING);
 
-	if(!video->openFile(audioCallback, freq, channels)){
+	if(!video->openFile(audioCallback, channels, freq)){
 		errorCallback(EFile, "could not open file");
 		delete video;
 		return 0;

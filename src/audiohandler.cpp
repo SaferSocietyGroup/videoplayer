@@ -37,8 +37,20 @@
 
 class CAudioHandler : public AudioHandler
 {
+	std::function<void(const Sample* buffer, int size)> audioCb;
+	int channels;
+	int freq;
+
+	AVCodecContext *aCodecCtx;
+	AVCodec *aCodec;
+	SwrContext* swr;
+		
+	uint8_t** dstBuf;
+	int dstLineSize;
+
 	public:
-	CAudioHandler(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq)
+	CAudioHandler(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, 
+		int channels, int freq)
 	{
 		this->aCodecCtx = aCodecCtx;
 
@@ -54,12 +66,8 @@ class CAudioHandler : public AudioHandler
 			return;
 		}
 
-		this->swr = swr_alloc_set_opts(NULL, AV_CH_LAYOUT_STEREO, AV_SAMPLE_FMT_S16, 48000,
-				aCodecCtx->channel_layout, aCodecCtx->sample_fmt, aCodecCtx->sample_rate, 0, NULL);
-		swr_init(this->swr);
-
-		int ret = av_samples_alloc_array_and_samples(&dstBuf, &dstLineSize, 2, 48000 * 2, AV_SAMPLE_FMT_S16, 0);
-		FlogAssert(ret >= 0, "error allocating samples: " << ret);
+		this->swr = 0;
+		this->dstBuf = 0;
 	}
 
 	~CAudioHandler()
@@ -71,6 +79,9 @@ class CAudioHandler : public AudioHandler
 		if(dstBuf)
 			av_freep(&dstBuf[0]);
 		av_freep(&dstBuf);
+
+		if(this->swr)
+			swr_free(&this->swr);
 	}
 
 	int decode(AVPacket& packet, double timeWarp){
@@ -84,6 +95,24 @@ class CAudioHandler : public AudioHandler
 		int bytesDecoded = avcodec_decode_audio4(aCodecCtx, frame, &got_frame, &packet);
 
 		if(bytesDecoded >= 0 && got_frame){
+			if(!this->swr){
+				int64_t chLayout = frame->channel_layout != 0 ? frame->channel_layout : 
+					av_get_default_channel_layout(frame->channels);
+
+				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(this->channels), 
+					AV_SAMPLE_FMT_S16, this->freq, chLayout, (AVSampleFormat)frame->format, 
+					frame->sample_rate, 0, NULL);
+
+				FlogAssert(this->swr, "error allocating swr");
+				
+				swr_init(this->swr);
+
+				int ret = av_samples_alloc_array_and_samples(&dstBuf, &dstLineSize, 2, 
+					this->freq * this->channels, AV_SAMPLE_FMT_S16, 0);
+
+				FlogAssert(ret >= 0, "error allocating samples: " << ret);
+			}
+
 			int dstSampleCount = av_rescale_rnd(frame->nb_samples, 48000, aCodecCtx->sample_rate, AV_ROUND_UP);
 
 			int ret = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)frame->data, frame->nb_samples);
@@ -124,18 +153,6 @@ class CAudioHandler : public AudioHandler
 		}
 		return "none";
 	}
-
-	private:
-	std::function<void(const Sample* buffer, int size)> audioCb;
-	int channels;
-	int freq;
-
-	AVCodecContext *aCodecCtx;
-	AVCodec *aCodec;
-	SwrContext* swr;
-		
-	uint8_t** dstBuf;
-	int dstLineSize;
 };
 
 AudioHandlerPtr AudioHandler::Create(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq)
