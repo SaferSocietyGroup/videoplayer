@@ -62,7 +62,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			samples->pop();
 		
 			for(int j = 0; j < 2; j++){
-				//s.chn[j] = (me->mute || me->qvMute) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
+				s.chn[j] = (me->mute || me->qvMute) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
 			}
 
 			stream[i+0] = s.chn[0] & 0xff;

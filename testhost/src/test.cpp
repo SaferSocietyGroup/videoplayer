@@ -99,7 +99,7 @@ int main(int argc, char** argv)
 			}
 
 			else if (buffer.type == "position"){
-				FlogD(std::string(buffer.data, buffer.dataLen));
+				//FlogD(std::string(buffer.data, buffer.dataLen));
 			}
 
 			else if (buffer.type == "eof"){
