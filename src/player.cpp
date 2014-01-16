@@ -221,10 +221,13 @@ void Player::Run(IPC& ipc)
 						SDL_UnlockAudio();
 					}, 48000, 2);
 
-				if(w && h) SetDims(w, h, video->getWidth(), video->getHeight());
-				else SetDims(video->getWidth(), video->getHeight(), video->getWidth(), video->getHeight());
-
-				FlogD("loaded");
+				if(video){
+					if(w && h)
+						SetDims(w, h, video->getWidth(), video->getHeight());
+					else
+						SetDims(video->getWidth(), video->getHeight(), video->getWidth(), video->getHeight());
+					FlogD("loaded");
+				}
 			}
 
 			else if(type == "quit"){
