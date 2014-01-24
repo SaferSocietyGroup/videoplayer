@@ -18,7 +18,7 @@ int WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int n
 int main(int argc, char** argv)
 #endif
 {
-	IPC ipc("test", true);
+	IPC ipc("videotest", true);
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 
@@ -57,6 +57,7 @@ int main(int argc, char** argv)
 			else CMD_REQ("step", 1) ipc.WriteMessage("step", arg.at(1));
 			else CMD_REQ("snapshot", 0) ipc.WriteMessage("snapshot", "");
 			else CMD_REQ("getkeyframes", 0) ipc.WriteMessage("getkeyframes", "");
+			else CMD_REQ("setkeyframes", 1) ipc.WriteMessage("getkeyframes", arg.at(1));
 			else CMD_REQ("setplaybackspeed", 1) ipc.WriteMessage("setplaybackspeed", arg.at(1));
 			
 			else CMD_REQ("host_suspend", 1)

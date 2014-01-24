@@ -15,20 +15,31 @@ void CommandLine::Start()
 
 int CommandLine::ThreadCallback(void* data)
 {
-	char line[4096];
+	std::string line;
 	bool done = false;
 
 	while(!done){
 		std::vector<std::string> cmd;
 		
-		std::cin.getline(line, 4096);
+		std::getline(std::cin, line);
 		std::stringstream parse(line);
+		std::string tmp;
 
-		while(parse.good()){
+		parse >> tmp;
+		cmd.push_back(tmp);
+
+		while(parse.peek() == ' ')
+			parse.get();
+
+		std::getline(parse, tmp);
+		if(tmp != "")
+			cmd.push_back(tmp);
+
+		/*while(parse.good()){
 			std::string tmp;
 			parse >> tmp;
 			cmd.push_back(tmp);
-		}
+		}*/
 
 		SDL_mutexP(mutex);
 		queue.push(cmd);
