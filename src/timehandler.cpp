@@ -33,45 +33,80 @@ TimeHandler::TimeHandler()
 	time = 0;
 	warp = 1;
 	paused = true;
+	mutex = SDL_CreateMutex();
+}
+
+TimeHandler::~TimeHandler()
+{
+	SDL_DestroyMutex(mutex);
+}
+
+void TimeHandler::lock()
+{
+	SDL_LockMutex(mutex);
+}
+
+void TimeHandler::unlock()
+{
+	SDL_UnlockMutex(mutex);
 }
 
 bool TimeHandler::getPaused()
 {
-	return paused;
+	lock();
+	bool ret = paused;
+	unlock();
+	return ret;
 }
 
 void TimeHandler::pause()
 {
+	lock();
 	paused = true;
+	unlock();
 }
 
 void TimeHandler::play()
 {
+	lock();
 	paused = false;
+	unlock();
 }
 
 void TimeHandler::setTime(double t)
 {
+	lock();
 	time = t;
+	unlock();
 }
 
 void TimeHandler::setTimeWarp(double tps)
 {
+	lock();
 	warp = tps;
+	unlock();
 }
 
 double TimeHandler::getTimeWarp()
 {
-	return warp;
+	lock();
+	double ret = warp;
+	unlock();
+	return ret;
 }
 
 double TimeHandler::getTime()
 {
-	return time;
+	lock();
+	double ret = time;
+	unlock();
+	return ret;
 }
 
 void TimeHandler::addTime(double t)
 {
+	lock();
 	if(!paused)
 		time += t * warp;
+	unlock();
 }

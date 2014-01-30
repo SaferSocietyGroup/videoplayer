@@ -37,29 +37,23 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 {
 	Player* me = (Player*)vMe;
 	SampleQueue* samples = &me->samples;
-	
-	me->timePassed += (double)(len / 4) / 48000.0;
 
+	//me->timePassed += (double)(len / 4) / 48000.0;
+	bool paused = me->video != 0 ? me->video->getPaused() : true;
+
+	double videoTime = me->video != 0 ? me->video->getTime() : 0;
+	double extraTime = 0;
+	
 	for(int i = 0; i < len; i += 4){
-#if 0
-		static float f;
-		Sample s;
+		extraTime += 1.0 / (double)me->freq;
 
-		s.chn[0] = sinf(f) * 16000.0f;
-		s.chn[1] = sinf(f += .1) * 16000.0f;
-	
-		stream[i+0] = s.chn[0] & 0xff;
-		stream[i+1] = (s.chn[0] >> 8) & 0xff; 
-		
-		stream[i+2] = s.chn[1] & 0xff;
-		stream[i+3] = (s.chn[1] >> 8) & 0xff;
-#endif
-
-		if(samples->empty() || me->paused){
-			stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
-		}else{
+		if(!samples->empty() && !paused){
 			Sample s = samples->front();
 			samples->pop();
+
+			double adjust = s.ts - (videoTime + extraTime);
+			if(adjust > 0)
+				extraTime += adjust;
 		
 			for(int j = 0; j < 2; j++){
 				s.chn[j] = (me->mute || me->qvMute) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
@@ -70,8 +64,19 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			
 			stream[i+2] = s.chn[1] & 0xff;
 			stream[i+3] = (s.chn[1] >> 8) & 0xff;
+		}else{
+			stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
+		}
+
+		if(extraTime > 1.0 / 60.0 && me->video != 0){
+			me->video->addTime(extraTime);
+			extraTime = 0;
+			videoTime = me->video->getTime();
 		}
 	}
+
+	if(me->video != 0)
+		me->video->addTime(extraTime);
 }
 
 Uint32 AudioFallbackTimer(Uint32 interval, void* data)
@@ -139,10 +144,12 @@ void Player::InitAudio()
 		FlogI("audio format accepted");
 	}
 
-	FlogExpD(fmt.freq);
-	FlogD(out.samples);
+	FlogExpD(out.freq);
+	FlogExpD(out.samples);
 	
 	initialized = true;
+
+	freq = out.freq;
 
 	SDL_PauseAudio(false);
 }
@@ -173,19 +180,17 @@ void Player::Run(IPC& ipc)
 	putenv(env);
 	SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO);
 
-	VideoPtr video = 0;
 	initialized = false;
 	std::queue<Message> sendQueue;
 
 	mute = qvMute = false;
 	volume = 1;
 
-	paused = false;
 	bool running = true;
 	InitAudio();	
 
 	w = h = 0;
-	timePassed = 0;
+	freq = 48000;
 
 	uint32_t keepAliveTimer = SDL_GetTicks();
 
@@ -364,12 +369,6 @@ void Player::Run(IPC& ipc)
 			
 		SDL_LockAudio();
 
-		if(video){
-			paused = video->getPaused();
-			video->addTime(timePassed);
-		}
-
-		timePassed = 0;
 		SDL_UnlockAudio();
 
 		if(video){

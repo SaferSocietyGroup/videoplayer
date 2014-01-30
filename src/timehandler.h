@@ -24,9 +24,12 @@
 #ifndef TIMEHANDLER_H
 #define TIMEHANDLER_H
 
+#include <SDL.h>
+
 class TimeHandler{
 	public:
 		TimeHandler();
+		~TimeHandler();
 		double getTime();
 		double getTimeWarp();
 		void pause();
@@ -37,8 +40,12 @@ class TimeHandler{
 		void addTime(double t);
 		
 	private:
+		void lock();
+		void unlock();
+
 		double time, warp;
 		bool paused;
+		SDL_mutex* mutex;
 };
 
 #endif

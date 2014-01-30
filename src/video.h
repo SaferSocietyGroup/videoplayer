@@ -101,6 +101,7 @@ class Video
 	virtual void pause() = 0;
 	virtual bool getPaused() = 0;
 	virtual void addTime(double t) = 0;
+	virtual double getTime() = 0;
 	
 	static VideoPtr Create(const std::string& filename, ErrorCallback errorHandler, AudioCallback audioCallback, int freq, int channels, const std::string& kf = "");
 };

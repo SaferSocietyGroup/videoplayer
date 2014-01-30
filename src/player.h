@@ -26,24 +26,27 @@
 
 #include "ipc.h"
 #include "samplequeue.h"
+#include "video.h"
 
 class Player
 {
 	SampleQueue samples;
+
 	void InitAudio();
 	void CloseAudio();
 	void SetDims(int nw, int nh, int vw, int vh);
 
 	bool initialized;
 	int w, h;
-	bool paused;
-	double timePassed;
 		
 	float volume;
 	bool mute, qvMute, audioOutputEnabled;
 	SDL_TimerID noAudioTimer;
 
 	public:
+	VideoPtr video;
+	int freq;
+
 	void PauseAudio(bool val);
 	void Run(IPC& ipc);
 	static void AudioCallback(void *me, Uint8 *stream, int len);

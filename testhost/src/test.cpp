@@ -52,7 +52,7 @@ int main(int argc, char** argv)
 			else CMD_REQ("play", 0) ipc.WriteMessage("play", ""); 
 			else CMD_REQ("pause", 0) ipc.WriteMessage("pause", ""); 
 			else CMD_REQ("getinfo", 0) ipc.WriteMessage("getinfo", ""); 
-			else CMD_REQ("setdims", 2) ipc.WriteMessage("setdims", Str(arg.at(1) << " " << arg.at(2)));
+			else CMD_REQ("setdims", 1) ipc.WriteMessage("setdims", arg.at(1));
 			else CMD_REQ("seek", 1) ipc.WriteMessage("seek", arg.at(1));
 			else CMD_REQ("step", 1) ipc.WriteMessage("step", arg.at(1));
 			else CMD_REQ("snapshot", 0) ipc.WriteMessage("snapshot", "");

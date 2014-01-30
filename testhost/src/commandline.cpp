@@ -31,6 +31,7 @@ int CommandLine::ThreadCallback(void* data)
 		while(parse.peek() == ' ')
 			parse.get();
 
+		tmp = "";
 		std::getline(parse, tmp);
 		if(tmp != "")
 			cmd.push_back(tmp);

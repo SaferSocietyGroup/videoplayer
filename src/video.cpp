@@ -169,7 +169,7 @@ class CVideo : public Video
 
 		if(pts > time + 1.0 || pts < time - 1.0){
 			FlogD("adjusted time");
-			timeHandler.setTime(pts);
+			//timeHandler.setTime(pts);
 		}
 	}
 
@@ -290,7 +290,7 @@ class CVideo : public Video
 		bool success = false;
 		while(!IsEof() && !success){
 			try {
-				while(frameQueue.size() < 10){
+				while(frameQueue.size() < 60){
 					decodeFrame(true);
 				}
 
@@ -429,7 +429,7 @@ class CVideo : public Video
 	}
 
 	double timeFromPts(uint64_t pts){
-		return (double)pts * (float)av_q2d(pFormatCtx->streams[videoStream]->time_base);
+		return (double)pts * av_q2d(pFormatCtx->streams[videoStream]->time_base);
 	}
 	
 	int getVideoBitRate(){
@@ -533,7 +533,7 @@ class CVideo : public Video
 
 						ret = TVideo;
 					}else{
-						if((bytesDecoded = audioHandler->decode(packet, timeHandler.getTimeWarp())) <= 0){
+						if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream],timeHandler.getTimeWarp())) <= 0){
 							bytesDecoded = bytesRemaining; // skip audio
 						}
 					}
@@ -1011,6 +1011,10 @@ class CVideo : public Video
 
 	void addTime(double t){
 		timeHandler.addTime(t);
+	}
+	
+	double getTime(){
+		return timeHandler.getTime();
 	}
 };
 

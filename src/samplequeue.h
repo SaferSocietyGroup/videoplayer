@@ -32,6 +32,7 @@
 #pragma pack(1)
 struct Sample {
 	int16_t chn[2];
+	double ts; 
 };
 #pragma pack(pop)
 
