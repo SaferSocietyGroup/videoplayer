@@ -87,6 +87,7 @@ class CVideo : public Video
 	int duration;
 	int framePosition;
 	int reachedEof;
+	int frameQueueSize;
 
 	Bitmap frameBitmap;
 	Error lastError;
@@ -105,9 +106,10 @@ class CVideo : public Video
 	float t;
 	bool drawTimeStamp;
 	
-	CVideo(ErrorCallback errorCallback){
+	CVideo(ErrorCallback errorCallback, int frameQueueSize){
 		this->errorCallback = errorCallback;
 
+		this->frameQueueSize = frameQueueSize;
 		reachedEof = 0;
 		framePosition = 0;
 		pCodec = 0;
@@ -299,7 +301,7 @@ class CVideo : public Video
 		bool success = false;
 		while(!IsEof() && !success){
 			try {
-				while(frameQueue.size() < 60){
+				while(frameQueue.size() < (unsigned int)frameQueueSize){
 					decodeFrame(true);
 				}
 
@@ -1050,13 +1052,14 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 	}
 }
 
-VideoPtr Video::Create(const std::string& filename, ErrorCallback errorCallback, AudioCallback audioCallback, int freq, int channels, const std::string& kf)
+VideoPtr Video::Create(const std::string& filename, ErrorCallback errorCallback, AudioCallback audioCallback,
+	int freq, int channels, int frameQueueSize, const std::string& kf)
 {
 	static bool initialized = false;
 	if(!initialized)
 		av_register_all();
 
-	CVideo* video = new CVideo(errorCallback);
+	CVideo* video = new CVideo(errorCallback, frameQueueSize);
 	video->filename = filename;
 
 	video->setIFrames(kf);

@@ -59,6 +59,7 @@ int main(int argc, char** argv)
 			else CMD_REQ("getkeyframes", 0) ipc.WriteMessage("getkeyframes", "");
 			else CMD_REQ("setkeyframes", 1) ipc.WriteMessage("getkeyframes", arg.at(1));
 			else CMD_REQ("setplaybackspeed", 1) ipc.WriteMessage("setplaybackspeed", arg.at(1));
+			else CMD_REQ("setquickviewplayer", 1) ipc.WriteMessage("setquickviewplayer", arg.at(1));
 			
 			else CMD_REQ("host_suspend", 1)
 				SDL_Delay(atof(arg.at(1).c_str()) * 1000.0f);

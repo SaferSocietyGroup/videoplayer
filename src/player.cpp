@@ -186,6 +186,8 @@ void Player::Run(IPC& ipc)
 	volume = 1;
 
 	bool running = true;
+	bool quickViewPlayer = false;
+
 	InitAudio();	
 
 	w = h = 0;
@@ -223,7 +225,7 @@ void Player::Run(IPC& ipc)
 						for(int i = 0; i < size; i++)
 							samples.push(buffer[i]);
 						SDL_UnlockAudio();
-					}, 48000, 2);
+					}, 48000, 2, quickViewPlayer ? 5 : 60);
 
 				if(video){
 					if(w && h)
@@ -232,6 +234,10 @@ void Player::Run(IPC& ipc)
 						SetDims(video->getWidth(), video->getHeight(), video->getWidth(), video->getHeight());
 					FlogD("loaded");
 				}
+			}
+			
+			else if(type == "setquickviewplayer"){
+				quickViewPlayer = (message == "true");
 			}
 
 			else if(type == "quit"){
