@@ -218,17 +218,13 @@ class CVideo : public Video
 		frameToBitmap(currentFrame.avFrame, bmp, sw, sh); 
 
 		if(drawTimeStamp){
-			double t = (int64_t)currentFrame.pts - timeFromPts(this->firstPts);
-			//FlogExpD(this->firstPts);
-			//FlogExpD(currentFrame.pts);
+			//double t = (int64_t)currentFrame.pts - timeFromPts(this->firstPts);
+			double t = timeHandler.getTime();
 
 			int seconds = (int)t % 60;
 			int hours = (int)(t / 3600);
 			int minutes = (int)(t / 60) - (hours * 60);
 			int frame = CLAMP(0, 5000, (int)((double)getFrameRate() * fmod(t, 1)));
-
-			//FlogExpD(t);
-			//FlogExpD(getFrameRate());
 
 			char buffer[512];
 			snprintf(buffer, sizeof(buffer), "%d:%02d:%02d.%02d", hours, minutes, seconds, frame);
@@ -258,7 +254,7 @@ class CVideo : public Video
 			// Try to seek with timestamp
 
 			if(exact){
-				to = std::max(frame - 300, 0);
+				to = std::max(frame - 100, 0);
 			}
 
 			if(!seekTs(to, exact /* seek to any frame */)){
