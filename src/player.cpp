@@ -327,7 +327,7 @@ void Player::Run(IPC& ipc)
 					s >> t;
 					FlogD("seek " << t);
 					samples.clear();
-					video->seek(t * (float)video->getDurationInFrames());
+					video->seek(t * (float)video->getDurationInFrames(), true);
 				}
 
 				else if(type == "setdims"){

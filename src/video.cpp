@@ -164,6 +164,20 @@ class CVideo : public Video
 		return newFrame;
 	}
 
+	// some decoders (eg. wmv) return invalid timestamps that are not
+	// AV_NOPTS_VALUE. This function detects those values.
+	inline bool isValidTs(int64_t ts)
+	{
+		if(ts == AV_NOPTS_VALUE)
+			return false;
+
+		// wmv decoder reports 7ffeffffffffffff, fail on very high values
+		if(ts > 0x7f00000000000000LL)
+			return false;
+
+		return true;
+	}
+
 	void adjustTime(){
 		// Checks so that the current time doesn't diff too much from the decoded frames.
 		// If it does the stream probably jumped ahead or back, so current time needs to 
@@ -263,9 +277,12 @@ class CVideo : public Video
 			if(exact){
 				// Step to the requested frame
 				try {
-					do{
+					// if it can't get to the requested frame in 350 tries, bail
+					for(int i = 0; i < 350; i++){
 						decodeFrame(false);
-					}while(getStreamPosition() < frame);
+						if(getStreamPosition() >= frame)
+							break;
+					}
 				}
 
 				catch(std::runtime_error e){
@@ -357,7 +374,7 @@ class CVideo : public Video
 	}
 
 	double getReportedDurationInSecs(){
-		if(pFormatCtx->duration != (int64_t)AV_NOPTS_VALUE)
+		if(isValidTs(pFormatCtx->duration))
 			return (double)pFormatCtx->duration / (double)AV_TIME_BASE;
 
 		return 0;
@@ -401,10 +418,12 @@ class CVideo : public Video
 	}
 
 	int getStreamPosition(){
-		if((uint64_t)pFormatCtx->streams[videoStream]->cur_dts == AV_NOPTS_VALUE){
+		// if the stream's timestamp is invalid, calculate the position from the frame rate
+		if(!isValidTs((uint64_t)pFormatCtx->streams[videoStream]->cur_dts)){
 			return (int)((lastPts - timeFromPts(firstPts)) * getFrameRate());
 		}
 
+		// the stream's timestamp is valid, calculate frame position based on that
 		return (int)(timeFromPts(pFormatCtx->streams[videoStream]->cur_dts - firstPts) 
 				* getFrameRate());
 	}
@@ -561,7 +580,7 @@ class CVideo : public Video
 		}
 
 		// set presentation timestamp to, in order of priority, frame.pts -> frame.pkt_pts -> frame.pkt_dts	
-		int64_t pts = decFrame->pts != AV_NOPTS_VALUE ? decFrame->pts : (decFrame->pkt_pts != AV_NOPTS_VALUE ? decFrame->pkt_pts : packet.dts);
+		int64_t pts = isValidTs(decFrame->pts) ? decFrame->pts : (isValidTs(decFrame->pkt_pts) ? decFrame->pkt_pts : packet.dts);
 		this->lastPts = timeFromPts(pts);
 
 		if(firstPts == 0)

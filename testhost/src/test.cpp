@@ -25,6 +25,7 @@ int main(int argc, char** argv)
 	SDL_Surface* screen = SDL_SetVideoMode(800, 600, 0, SDL_SWSURFACE);
 
 	bool done = false;
+	int positionCounter = 0;
 
 	CommandLine::Start();
 
@@ -101,7 +102,8 @@ int main(int argc, char** argv)
 			}
 
 			else if (buffer.type == "position"){
-				//FlogD(std::string(buffer.data, buffer.dataLen));
+				if((positionCounter++) % 10 == 0)
+					FlogD("pos: " << std::string(buffer.data, buffer.dataLen));
 			}
 
 			else if (buffer.type == "eof"){
