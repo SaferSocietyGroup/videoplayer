@@ -38,7 +38,6 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 	Player* me = (Player*)vMe;
 	SampleQueue* samples = &me->samples;
 
-	//me->timePassed += (double)(len / 4) / 48000.0;
 	bool paused = me->video != 0 ? me->video->getPaused() : true;
 
 	double videoTime = me->video != 0 ? me->video->getTime() : 0;
@@ -68,7 +67,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
 		}
 
-		if(extraTime > 1.0 / 60.0 && me->video != 0){
+		if(extraTime >= 1.0 / 120.0 && me->video != 0){
 			me->video->addTime(extraTime);
 			extraTime = 0;
 			videoTime = me->video->getTime();
@@ -366,10 +365,6 @@ void Player::Run(IPC& ipc)
 				}
 			}
 		}
-			
-		SDL_LockAudio();
-
-		SDL_UnlockAudio();
 
 		if(video){
 			video->tick();
@@ -385,8 +380,9 @@ void Player::Run(IPC& ipc)
 
 				video->frameToSurface(frame, (uint8_t*)buffer + 4, w, h);
 				ipc.ReturnWriteBuffer("frame", &buffer, w * h * 3 + 4);
-			
+
 				ipc.WriteMessage("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
+
 			}else{
 				//FlogD("no frame");
 			}
@@ -407,7 +403,7 @@ void Player::Run(IPC& ipc)
 			running = false;
 		}
 
-		Sleep(1);
+		//Sleep(1);
 	}
 
 	FlogD("exiting");

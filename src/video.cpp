@@ -50,6 +50,14 @@ class KfPos
 	int64_t dts;
 };
 
+struct FrameSorter
+{
+	bool operator()(const Frame& a, const Frame& b) const
+	{
+		return a.pts > b.pts;
+	}
+};
+
 class CVideo : public Video
 {
 	public:
@@ -83,7 +91,7 @@ class CVideo : public Video
 	Bitmap frameBitmap;
 	Error lastError;
 
-	std::queue<Frame> frameQueue;
+	std::priority_queue<Frame, std::vector<Frame>, FrameSorter> frameQueue;
 	
 	double lastPts;
 	int64_t lastDts;
@@ -134,7 +142,7 @@ class CVideo : public Video
 	Frame fetchFrame(){
 		if(stepIntoQueue && !frameQueue.empty()){
 			stepIntoQueue = false;
-			timeHandler.setTime(frameQueue.front().pts + .001);
+			timeHandler.setTime(frameQueue.top().pts + .001);
 		}
 
 		double time = timeHandler.getTime();
@@ -144,10 +152,10 @@ class CVideo : public Video
 		// Throw away all old frames (timestamp older than now) except for the last
 		// and set the pFrame pointer to that.
 
-		while(!frameQueue.empty() && frameQueue.front().pts < time){
+		while(!frameQueue.empty() && frameQueue.top().pts < time){
 			freeFrame(&newFrame.avFrame);
 
-			newFrame = frameQueue.front();
+			newFrame = frameQueue.top();
 			frameQueue.pop();
 		}
 
@@ -162,7 +170,7 @@ class CVideo : public Video
 		if(frameQueue.empty()) return;
 
 		double time = timeHandler.getTime();
-		double pts = frameQueue.front().pts;
+		double pts = frameQueue.top().pts;
 
 		// If the next frame is more than one second into the future or the past, 
 		// set the time to now
@@ -220,6 +228,7 @@ class CVideo : public Video
 
 	/* Seek to given frame */
 	bool seek(int frame, bool exact = false){
+		reachedEof = 0;
 		frame = std::min(std::max(0, frame), getDurationInFrames());
 		emptyFrameQueue();
 
@@ -294,6 +303,11 @@ class CVideo : public Video
 					decodeFrame(true);
 				}
 
+				/*while(!frameQueue.empty()){
+					FlogExpD(frameQueue.top().pts);
+					frameQueue.pop();
+				}*/
+
 				success = true;
 				reachedEof = 0;
 			}
@@ -303,8 +317,6 @@ class CVideo : public Video
 				if(IsEof()){
 					FlogExpD(reachedEof);
 					errorCallback(EEof, "eof");
-					reachedEof = 0;
-					return;
 				}else{
 					FlogD("demuxer failed, trying again");
 				}
@@ -471,7 +483,6 @@ class CVideo : public Video
 	FrameType decodeFrame(bool addToQueue, bool demux = true){
 		int frameFinished = 0;
 		int panicFrame = 0;
-		uint64_t lastPts = 0;
 		FrameType ret = TAudio;
 
 		//av_free(decFrame->data[0]);
@@ -512,16 +523,6 @@ class CVideo : public Video
 
 						//LogExp(packet.flags & PKT_FLAG_KEY);
 
-						if((uint64_t)packet.pts != AV_NOPTS_VALUE){
-							lastPts = packet.pts;
-						}else{
-							// Packet/stream has no presentation timestamp. Use decoding timestamp instead.
-							lastPts = packet.dts;
-						}
-
-						if(firstPts == 0)
-							firstPts = lastPts;
-						
 						if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame, &frameFinished, &packet)) < 0 )
 						{
 							lastError = EDecoding;
@@ -557,18 +558,16 @@ class CVideo : public Video
 			}
 		}
 
-		this->lastPts = timeFromPts(lastPts);
-		//FlogExpD(lastPts);
+		// set presentation timestamp to, in order of priority, frame.pts -> frame.pkt_pts -> frame.pkt_dts	
+		int64_t pts = decFrame->pts != AV_NOPTS_VALUE ? decFrame->pts : (decFrame->pkt_pts != AV_NOPTS_VALUE ? decFrame->pkt_pts : packet.dts);
+		this->lastPts = timeFromPts(pts);
+
+		if(firstPts == 0)
+			firstPts = pts;
 
 		if(addToQueue && ret == TVideo){
 			AVFrame* clone = cloneFrame(decFrame);
 			frameQueue.push(Frame(clone, this->lastPts, framePosition));
-
-			// The frame we just decoded is older than timestamp of the position we're supposed to be at
-			// Adjust the time for slower decoding
-			if(this->lastPts < timeHandler.getTime()){
-				timeHandler.setTime(this->lastPts);
-			}
 		}
 
 		return ret;
@@ -733,8 +732,9 @@ class CVideo : public Video
 	void emptyFrameQueue(){
 		// Free buffered decoded frames
 		while(!frameQueue.empty()){
-			freeFrame(&frameQueue.front().avFrame);
+			Frame topFrame = frameQueue.top();
 			frameQueue.pop();
+			freeFrame(&topFrame.avFrame);
 		}
 	}
 
@@ -969,7 +969,7 @@ class CVideo : public Video
 	}
 
 	bool IsEof(){
-		return reachedEof > 2000;
+		return reachedEof > 10;
 	}
 
 	// frame = frame number
