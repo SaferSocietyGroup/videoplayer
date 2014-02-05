@@ -105,6 +105,7 @@ class CVideo : public Video
 	std::string filename;
 	float t;
 	bool drawTimeStamp;
+	bool reportedEof;
 	
 	CVideo(ErrorCallback errorCallback, int frameQueueSize){
 		this->errorCallback = errorCallback;
@@ -124,6 +125,7 @@ class CVideo : public Video
 		firstPts = 0;
 		t = 0.0f;
 		stepIntoQueue = true;
+		reportedEof = false;
 
 		timeHandler.pause();
 		decFrame = avcodec_alloc_frame();
@@ -142,6 +144,11 @@ class CVideo : public Video
 	}
 
 	Frame fetchFrame(){
+		if(frameQueue.empty() && IsEof() && !reportedEof){
+			reportedEof = true;
+			errorCallback(EEof, "eof");
+		}
+
 		if(stepIntoQueue && !frameQueue.empty()){
 			stepIntoQueue = false;
 			timeHandler.setTime(frameQueue.top().pts + .001);
@@ -241,6 +248,7 @@ class CVideo : public Video
 	/* Seek to given frame */
 	bool seek(int frame, bool exact = false){
 		reachedEof = 0;
+		reportedEof = false;
 		frame = std::min(std::max(0, frame), getDurationInFrames());
 		emptyFrameQueue();
 
@@ -294,6 +302,7 @@ class CVideo : public Video
 		stepIntoQueue = true;
 
 		reachedEof = 0;
+		reportedEof = false;
 
 		return true;
 	}
@@ -325,13 +334,13 @@ class CVideo : public Video
 
 				success = true;
 				reachedEof = 0;
+				reportedEof = false;
 			}
 
 			catch(std::runtime_error e){
 				reachedEof++;
 				if(IsEof()){
 					FlogExpD(reachedEof);
-					errorCallback(EEof, "eof");
 				}else{
 					FlogD("demuxer failed, trying again");
 				}
