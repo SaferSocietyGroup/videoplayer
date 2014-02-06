@@ -12,10 +12,10 @@ lib-static       libavdevice libavformat libavcodec libavfilter libswscale libav
 #ldflags         mconsole 
 
 # link statically
-ldflags          static-libgcc "Wl,-Bstatic $(tmpdir)/versioninfo.res"
+ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'"
 
 # generate version information for executable
-prebuildscript   "$(host_dash)windres -O coff -o $(tmpdir)/versioninfo.res res/versioninfo.rc"
+prebuildscript   "$(host_dash)windres -O coff -o '$(tmpdir)/versioninfo.res' res/versioninfo.rc"
 
 [*debug: common]
 cflags           O0
