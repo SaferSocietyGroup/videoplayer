@@ -1,4 +1,0 @@
-include         spank/common.inc
-cflags          O0
-postbuildscript "echo built DEBUG version"
-
