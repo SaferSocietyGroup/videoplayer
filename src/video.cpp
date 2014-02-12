@@ -36,10 +36,9 @@
 #include <iomanip>
 
 #include "video.h"
-#include "font.h"
 #include "log.h"
-#include "bitmap.h"
 #include "flog.h"
+#include "tools.h"
 
 class KfPos
 {
@@ -615,36 +614,6 @@ class CVideo : public Video
 
 		LogDebug("couldn't find a video frame in 100 steps");
 		return false;
-	}
-
-
-	void frameToBitmap(AVFrame* pFrame, Bitmap& bitmap, int w, int h){
-		PixelFormat fffmt = bitmap.bytesPerPixel == 4 ? PIX_FMT_BGRA : PIX_FMT_BGR24;
-
-		int avret = avpicture_fill(&pict, (uint8_t*)bitmap.pixels , fffmt, bitmap.w, bitmap.h);
-
-		if(avret < 0){
-			LogError("avpicture_fill returned " << avret);
-			throw std::runtime_error("avpicture_fill error");
-		}
-
-		struct SwsContext* swsCtx = sws_getContext(pCodecCtx->width, pCodecCtx->height, 
-			pCodecCtx->pix_fmt, w, h, fffmt, SWS_BILINEAR, NULL, NULL, NULL);
-
-		if(swsCtx){
-			sws_scale(swsCtx, (uint8_t**)pFrame->data, pFrame->linesize, 0, pCodecCtx->height, pict.data, pict.linesize); 
-			sws_freeContext(swsCtx);
-		}else{
-			LogError("Failed to get a scaling context");
-		}
-		
-		// TODO why doesn't it set the alpha channel automatically?
-
-		if(bitmap.bytesPerPixel == 4){
-			Color* p = (Color*)bitmap.pixels;
-			for(int i = 0; i < bitmap.w * bitmap.h; i++)
-				(p++)->a = 255;
-		}
 	}
 
 	AVFrame* cloneFrame(AVFrame* src){
