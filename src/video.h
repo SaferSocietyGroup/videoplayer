@@ -70,7 +70,7 @@ class Video
 
 	virtual Frame fetchFrame() = 0;
 	virtual void adjustTime() = 0;
-	virtual void frameToSurface(Frame frame, uint8_t* buffer, int w = 0, int h = 0, int sw = 0, int sh = 0) = 0;
+	virtual void frameToOverlay(Frame frame, uint8_t** buffers, int w = 0, int h = 0, int sw = 0, int sh = 0) = 0;
 	virtual bool seek(int frame, bool exact = false) = 0;
 	virtual bool step() = 0;
 	virtual bool stepBack() = 0;

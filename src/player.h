@@ -28,6 +28,9 @@
 #include "samplequeue.h"
 #include "video.h"
 
+#include <cstdint>
+#include <SDL.h>
+
 class Player
 {
 	SampleQueue samples;
@@ -42,13 +45,14 @@ class Player
 	float volume;
 	bool mute, qvMute, audioOutputEnabled;
 	SDL_TimerID noAudioTimer;
+	SDL_Surface* screen;
 
 	public:
 	VideoPtr video;
 	int freq;
 
 	void PauseAudio(bool val);
-	void Run(IPC& ipc);
+	void Run(IPC& ipc, intptr_t handle);
 	static void AudioCallback(void *me, Uint8 *stream, int len);
 };
 

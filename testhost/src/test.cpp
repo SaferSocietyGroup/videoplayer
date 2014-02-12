@@ -1,4 +1,5 @@
 #include <SDL.h>
+#include <SDL_syswm.h>
 #include <ipc.h>
 #include <flog.h>
 #include <sstream>
@@ -23,6 +24,13 @@ int main(int argc, char** argv)
 	SDL_Init(SDL_INIT_EVERYTHING);
 
 	SDL_Surface* screen = SDL_SetVideoMode(800, 600, 0, SDL_SWSURFACE);
+
+	SDL_SysWMinfo info;
+	memset(&info, 0, sizeof(SDL_SysWMinfo));
+	SDL_VERSION(&info.version);
+	if (SDL_GetWMInfo(&info))
+		FlogI("window handle: " << (intptr_t)info.window);
+
 
 	bool done = false;
 	int positionCounter = 0;
@@ -73,7 +81,7 @@ int main(int argc, char** argv)
 		if(buffer.data){
 			if(buffer.type == "frame"){
 
-				uint16_t width = *((uint16_t*)buffer.data);
+				/*uint16_t width = *((uint16_t*)buffer.data);
 				uint16_t height = *(((uint16_t*)buffer.data) + 1);
 
 				if(!surface || surface->w != (int)width || surface->h != (int)height){
@@ -88,7 +96,7 @@ int main(int argc, char** argv)
 				if(surface){
 					SDL_BlitSurface(surface, NULL, screen, NULL);
 					SDL_Flip(screen);
-				}
+				}*/
 			}
 	
 			else if(buffer.type == "keepalive"){

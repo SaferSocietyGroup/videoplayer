@@ -173,11 +173,15 @@ void Player::SetDims(int nw, int nh, int vw, int vh)
 	FlogExpD(h);
 }
 
-void Player::Run(IPC& ipc)
+void Player::Run(IPC& ipc, intptr_t handle)
 {
-	char env[] = "SDL_AUDIODRIVER=dsound";
-	putenv(env);
-	SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO);
+	SDL_putenv("SDL_AUDIODRIVER=dsound");
+	SDL_putenv(Str("SDL_WINDOWID=" << handle).c_str());
+
+	//SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO);
+	SDL_Init(SDL_INIT_EVERYTHING);
+
+	screen = SDL_SetVideoMode(640, 480, 0, 0);
 
 	initialized = false;
 	std::queue<Message> sendQueue;
@@ -194,8 +198,16 @@ void Player::Run(IPC& ipc)
 	freq = 48000;
 
 	uint32_t keepAliveTimer = SDL_GetTicks();
+	SDL_Overlay* overlay = 0;
 
 	while(running){
+		SDL_Event event;
+		while(SDL_PollEvent(&event)){
+			if(event.type == SDL_QUIT)
+				running = false;
+		}
+
+
 		for(unsigned int i = 0; i < sendQueue.size(); i++){
 			if(ipc.WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
 				sendQueue.pop();
@@ -343,6 +355,7 @@ void Player::Run(IPC& ipc)
 				}
 
 				else if(type == "snapshot"){
+#if 0
 					FlogD("got a snapshot");
 					char* buffer = ipc.GetWriteBuffer();
 
@@ -361,6 +374,7 @@ void Player::Run(IPC& ipc)
 					} else {
 						FlogW("no frame to send");
 					}
+#endif
 				}
 			}
 
@@ -379,18 +393,27 @@ void Player::Run(IPC& ipc)
 			Frame frame = video->fetchFrame();
 
 			if(frame.avFrame){
-				//FlogD("got a frame");
-				char* buffer = ipc.GetWriteBuffer();
-				*((uint16_t*)buffer) = w;
-				*(((uint16_t*)buffer) + 1) = h;
+				int vw = video->getWidth();
+				int vh = video->getHeight();
 
-				video->frameToSurface(frame, (uint8_t*)buffer + 4, w, h);
-				ipc.ReturnWriteBuffer("frame", &buffer, w * h * 3 + 4);
+				// if there's an overlay that doesn't match the video dimensions, delete it
+				if(overlay != 0 && (overlay->w != vw || vh != video->getHeight())){
+					SDL_FreeYUVOverlay(overlay);
+					overlay = 0;
+				}
 
-				ipc.WriteMessage("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
+				// if there's no overlay, create one that matches the video dimensions
+				if(overlay == 0)
+					overlay = SDL_CreateYUVOverlay(vw, vh, SDL_YV12_OVERLAY, screen);
 
-			}else{
-				//FlogD("no frame");
+				// write framedata to overlay
+				SDL_LockYUVOverlay(overlay);
+				video->frameToOverlay(frame, overlay->pixels, vw, vh);
+				SDL_UnlockYUVOverlay(overlay);
+
+				SDL_Rect r = {0, 0, (Uint16)w, (Uint16)h};
+				SDL_DisplayYUVOverlay(overlay, &r);
+				SDL_Flip(screen);
 			}
 		}
 
@@ -408,6 +431,8 @@ void Player::Run(IPC& ipc)
 			FlogD("dying bye bye");
 			running = false;
 		}
+
+		//SDL_Flip(screen);
 
 		//Sleep(1);
 	}

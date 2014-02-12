@@ -31,26 +31,31 @@
 #include "player.h"
 #include "flog.h"
 #include "log.h"
-#include <iostream>
-//#include "inforetreiver.h"
 
-#include <cstdio>
+#include <iostream>
+#include <sstream>
+#include <cstdint>
 
 int main_wrap(int argc, char** argv)
 {
 	std::cout << "starting video player" << std::endl;
 
-	FlogAssert(argc == 2, "expected 1 parameter with a base-name for a memory mapped file");
+	FlogAssert(argc == 3, "expected 2 parameters: [with a base-name for a memory mapped file] [window handle of host]");
 	FlogD("arg1: " << argv[1]);
 
 	FlogD("starting ipc");
 
 	Sleep(1000);
 	IPC ipc(argv[1]);
+
+	std::stringstream ss(argv[2]);
+	intptr_t handle;
+
+	ss >> handle;
 	
 	FlogD("starting player");
 	Player player;
-	player.Run(ipc);
+	player.Run(ipc, handle);
 
 	return 0;
 }

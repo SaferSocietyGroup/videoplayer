@@ -89,7 +89,6 @@ class CVideo : public Video
 	int reachedEof;
 	int frameQueueSize;
 
-	Bitmap frameBitmap;
 	Error lastError;
 
 	std::priority_queue<Frame, std::vector<Frame>, FrameSorter> frameQueue;
@@ -207,13 +206,15 @@ class CVideo : public Video
 	/* Decode frame, convert to RGB and put on given surface with given dimensions */
 	/* Note: this method must be called on each fetched frame or the decoding won't progress */
 	/* TODO: this function has tons of side effects and really shouldn't work like it does */
-	void frameToSurface(Frame newFrame, uint8_t* buffer, int w, int h, int sw, int sh){
-		if(!w) w = pCodecCtx->width; 
-		if(!h) h = pCodecCtx->height; 
-		if(!sw) sw = w;
-		if(!sh) sh = h;
-
-		if(!newFrame.avFrame) return;
+	void frameToOverlay(Frame newFrame, uint8_t** buffers, int w, int h, int sw, int sh){
+		if(!newFrame.avFrame)
+			return;
+		
+		// set source and destination widths to default values if they're 0
+		w = w > 0 ? w : pCodecCtx->width;
+		h = h > 0 ? h : pCodecCtx->height;
+		sw = sw > 0 ? sw : w;
+		sh = sh > 0 ? sh : h;
 
 		// Don't free currentFrame if it is currentFrame itself that's being converted
 		if(currentFrame.avFrame != newFrame.avFrame){
@@ -221,28 +222,25 @@ class CVideo : public Video
 			currentFrame = newFrame; // Save the current frame for snapshots etc.
 		}
 
-		Bitmap bmp(sw, sh, (void*)buffer, 3);
-		frameToBitmap(currentFrame.avFrame, bmp, sw, sh); 
+		//PixelFormat fffmt = bitmap.bytesPerPixel == 4 ? PIX_FMT_BGRA : PIX_FMT_BGR24;
+		PixelFormat fffmt = PIX_FMT_YUV420P;
 
-		if(drawTimeStamp){
-			//double t = (int64_t)currentFrame.pts - timeFromPts(this->firstPts);
-			double t = timeHandler.getTime();
+		int avret = avpicture_fill(&pict, NULL, fffmt, sw, sh);
+		if(avret < 0)
+			throw std::runtime_error(Str("avpicture_fill error: " << avret));
 
-			int seconds = (int)t % 60;
-			int hours = (int)(t / 3600);
-			int minutes = (int)(t / 60) - (hours * 60);
-			int frame = CLAMP(0, 5000, (int)((double)getFrameRate() * fmod(t, 1)));
+		pict.data[0] = buffers[0];
+		pict.data[1] = buffers[2];
+		pict.data[2] = buffers[1];
+			 
+		struct SwsContext* swsCtx = sws_getContext(pCodecCtx->width, pCodecCtx->height, 
+			pCodecCtx->pix_fmt, w, h, fffmt, SWS_BILINEAR, NULL, NULL, NULL);
 
-			char buffer[512];
-			snprintf(buffer, sizeof(buffer), "%d:%02d:%02d.%02d", hours, minutes, seconds, frame);
+		if(swsCtx == 0)
+			throw std::runtime_error("could not create scaling context");
 
-			Bitmap tt = DrawText(
-					buffer, 
-					Color(255, 255, 255, 255));
-
-			tt.draw(bmp, bmp.w - tt.w - 10, 10);
-			tt.freePixels();
-		}
+		sws_scale(swsCtx, (uint8_t**)newFrame.avFrame->data, newFrame.avFrame->linesize, 0, pCodecCtx->height, pict.data, pict.linesize); 
+		sws_freeContext(swsCtx);
 	}
 
 	/* Seek to given frame */
