@@ -181,7 +181,8 @@ void Player::Run(IPC& ipc, intptr_t handle)
 	//SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO | SDL_INIT_VIDEO);
 	SDL_Init(SDL_INIT_EVERYTHING);
 
-	screen = SDL_SetVideoMode(640, 480, 0, 0);
+	screen = SDL_SetVideoMode(720, 480, 0, 0);
+	FlogAssert(screen, "could not create screen");
 
 	initialized = false;
 	std::queue<Message> sendQueue;
@@ -194,7 +195,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 
 	InitAudio();	
 
-	w = h = 0;
+	x = y = w = h = 0;
 	freq = 48000;
 
 	uint32_t keepAliveTimer = SDL_GetTicks();
@@ -344,10 +345,9 @@ void Player::Run(IPC& ipc, intptr_t handle)
 
 				else if(type == "setdims"){
 					int w, h;
-					FlogD("setdims " << w << " " << h);
 
-					FlogExpD(message);
-
+					s >> x;
+					s >> y;
 					s >> w;
 					s >> h;
 
@@ -393,6 +393,13 @@ void Player::Run(IPC& ipc, intptr_t handle)
 			Frame frame = video->fetchFrame();
 
 			if(frame.avFrame){
+				// if the screen surface is smaller than the requested output size, resize the output
+				if(screen->w < x + w || screen->h < y + h){
+					SDL_FreeSurface(screen);
+					screen = SDL_SetVideoMode(x + w, y + h, 0, 0);
+					FlogAssert(screen, "could not create screen");
+				}
+
 				int vw = video->getWidth();
 				int vh = video->getHeight();
 
@@ -411,8 +418,9 @@ void Player::Run(IPC& ipc, intptr_t handle)
 				video->frameToOverlay(frame, overlay->pixels, vw, vh);
 				SDL_UnlockYUVOverlay(overlay);
 
-				SDL_Rect r = {0, 0, (Uint16)w, (Uint16)h};
+				SDL_Rect r = {(int16_t)x, (int16_t)y, (uint16_t)w, (uint16_t)h};
 				SDL_DisplayYUVOverlay(overlay, &r);
+				//SDL_UpdateRect(screen, r.x, r.y, r.w, r.h);
 				SDL_Flip(screen);
 			}
 		}

@@ -40,7 +40,7 @@ class Player
 	void SetDims(int nw, int nh, int vw, int vh);
 
 	bool initialized;
-	int w, h;
+	int x, y, w, h;
 		
 	float volume;
 	bool mute, qvMute, audioOutputEnabled;

@@ -23,7 +23,7 @@ int main(int argc, char** argv)
 
 	SDL_Init(SDL_INIT_EVERYTHING);
 
-	SDL_Surface* screen = SDL_SetVideoMode(800, 600, 0, SDL_SWSURFACE);
+	volatile SDL_Surface* screen = SDL_SetVideoMode(800, 600, 0, SDL_SWSURFACE | SDL_RESIZABLE);
 
 	SDL_SysWMinfo info;
 	memset(&info, 0, sizeof(SDL_SysWMinfo));
@@ -37,7 +37,7 @@ int main(int argc, char** argv)
 
 	CommandLine::Start();
 
-	SDL_Surface* surface = 0;
+	//SDL_Surface* surface = 0;
 
 	while(!done){
 		SDL_Event event;
