@@ -27,7 +27,6 @@
 
 #include "common.h"
 
-#include "ipc.h"
 #include "player.h"
 #include "flog.h"
 #include "log.h"
@@ -41,12 +40,9 @@ int main_wrap(int argc, char** argv)
 	std::cout << "starting video player" << std::endl;
 
 	FlogAssert(argc == 3, "expected 2 parameters: [with a base-name for a memory mapped file] [window handle of host]");
-	FlogD("arg1: " << argv[1]);
-
-	FlogD("starting ipc");
 
 	Sleep(1000);
-	IPC ipc(argv[1]);
+	IpcMessageQueuePtr ipc = IpcMessageQueue::Open(argv[1]);
 
 	std::stringstream ss(argv[2]);
 	intptr_t handle;

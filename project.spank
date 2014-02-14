@@ -7,7 +7,7 @@ cflags           ggdb
 sourcedir        src
 cflags           std=c++0x Wall Wno-deprecated-declarations
 
-lib-static       libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl
+lib-static       libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl libshmipc
 
 #ldflags         mconsole 
 

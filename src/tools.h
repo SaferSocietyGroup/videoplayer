@@ -44,6 +44,9 @@ typedef unsigned char byte;
 // Strings
 #define Str(__what) [&]() -> std::string {std::stringstream __tmp; __tmp << __what; return __tmp.str(); }()
 #define ExpStr(__exp) Str(#__exp << " = " << __exp << " ")
+#define AssertEx(__exp, __ex, __msg) if(!(__exp)){ throw \
+	__ex(Str(__msg << " (" __FILE__":" << __LINE__ << ")")); }
+
 
 #define POW2(__x) ((__x) * (__x))
 

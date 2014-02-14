@@ -26,7 +26,6 @@
 #include "player.h"
 #include "video.h"
 #include "common.h"
-#include "ipc.h"
 #include "audiohandler.h"
 #include "flog.h"
 #include "tools.h"
@@ -173,7 +172,7 @@ void Player::SetDims(int nw, int nh, int vw, int vh)
 	FlogExpD(h);
 }
 
-void Player::Run(IPC& ipc, intptr_t handle)
+void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 {
 	SDL_putenv("SDL_AUDIODRIVER=dsound");
 	SDL_putenv(Str("SDL_WINDOWID=" << handle).c_str());
@@ -210,7 +209,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 
 
 		for(unsigned int i = 0; i < sendQueue.size(); i++){
-			if(ipc.WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
+			if(ipc->WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
 				sendQueue.pop();
 			}
 		}
@@ -218,7 +217,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 		std::string type, message;
 
 		int timeout = video && !video->getPaused() ? 8 : 1000;
-		while(ipc.ReadMessage(type, message, timeout)){
+		while(ipc->ReadMessage(type, message, timeout)){
 			if(type == "keepalive") keepAliveTimer = SDL_GetTicks();
 
 			if(type == "load"){
@@ -228,9 +227,9 @@ void Player::Run(IPC& ipc, intptr_t handle)
 					// error handler
 					[&](Video::Error error, const std::string& msg){
 						if(error < Video::EEof)
-							ipc.WriteMessage("error", message);
+							ipc->WriteMessage("error", message);
 						else
-							ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", message);
+							ipc->WriteMessage(error == Video::EEof ? "eof" : "unloaded", message);
 					},
 					// audio handler
 					[&](const Sample* buffer, int size){
@@ -299,7 +298,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 				}
 
 				else if(type == "getkeyframes"){
-					ipc.WriteMessage("keyframes", video->getIFrames());
+					ipc->WriteMessage("keyframes", video->getIFrames());
 				}
 
 				else if(type == "play") {
@@ -315,18 +314,18 @@ void Player::Run(IPC& ipc, intptr_t handle)
 				}
 
 				else if(type == "getinfo") {
-					ipc.WriteMessage("dimensions", Str(video->getWidth() << " " << Str(video->getHeight())));
-					ipc.WriteMessage("videocodec", video->getVideoCodecName());
-					ipc.WriteMessage("format", video->getFormat());
-					ipc.WriteMessage("duration_in_frames", Str(video->getDurationInFrames()));
-					ipc.WriteMessage("reported_duration_in_frames", Str(video->getReportedDurationInFrames()));
-					ipc.WriteMessage("framerate", Str(video->getFrameRate()));
-					ipc.WriteMessage("reported_framerate", Str(video->getReportedFrameRate()));					
-					ipc.WriteMessage("aspectratio", Str(video->getAspect()));
-					ipc.WriteMessage("reported_length_in_secs", Str(video->getReportedDurationInSecs()));
-					ipc.WriteMessage("length_in_secs", Str(video->getDurationInSecs()));
-					ipc.WriteMessage("sample_rate", Str(video->getSampleRate()));
-					ipc.WriteMessage("audio_num_channels", Str(video->getNumChannels()));
+					ipc->WriteMessage("dimensions", Str(video->getWidth() << " " << Str(video->getHeight())));
+					ipc->WriteMessage("videocodec", video->getVideoCodecName());
+					ipc->WriteMessage("format", video->getFormat());
+					ipc->WriteMessage("duration_in_frames", Str(video->getDurationInFrames()));
+					ipc->WriteMessage("reported_duration_in_frames", Str(video->getReportedDurationInFrames()));
+					ipc->WriteMessage("framerate", Str(video->getFrameRate()));
+					ipc->WriteMessage("reported_framerate", Str(video->getReportedFrameRate()));					
+					ipc->WriteMessage("aspectratio", Str(video->getAspect()));
+					ipc->WriteMessage("reported_length_in_secs", Str(video->getReportedDurationInSecs()));
+					ipc->WriteMessage("length_in_secs", Str(video->getDurationInSecs()));
+					ipc->WriteMessage("sample_rate", Str(video->getSampleRate()));
+					ipc->WriteMessage("audio_num_channels", Str(video->getNumChannels()));
 				}
 
 				else if(type == "step"){
@@ -357,7 +356,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 				else if(type == "snapshot"){
 #if 0
 					FlogD("got a snapshot");
-					char* buffer = ipc.GetWriteBuffer();
+					char* buffer = ipc->GetWriteBuffer();
 
 					uint16_t w = video->getWidth(), h = video->getHeight();
 
@@ -369,7 +368,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 					if(currentFrame.avFrame){
 						FlogD("snapshot w: " << w << " h: " << h);
 						video->frameToSurface(currentFrame, (uint8_t*)buffer + 4, w, h);
-						ipc.ReturnWriteBuffer("snapshot", &buffer, w * h * 3 + 4);
+						ipc->ReturnWriteBuffer("snapshot", &buffer, w * h * 3 + 4);
 						FlogD("sent snapshot data");
 					} else {
 						FlogW("no frame to send");
@@ -381,7 +380,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 			// !video
 			else {
 				if(type == "getkeyframes"){
-					ipc.WriteMessage("keyframes", "error");
+					ipc->WriteMessage("keyframes", "error");
 				}
 			}
 		}
@@ -431,7 +430,7 @@ void Player::Run(IPC& ipc, intptr_t handle)
 
 		// Send keepalive every ~5 seconds
 		if(SDL_GetTicks() - keepAliveTimer > 5000){
-			ipc.WriteMessage("keepalive", "");
+			ipc->WriteMessage("keepalive", "");
 		}
 
 		// No keepalive message for ~30 seconds, die

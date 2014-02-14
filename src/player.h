@@ -24,7 +24,7 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
-#include "ipc.h"
+#include "IpcMessageQueue.h"
 #include "samplequeue.h"
 #include "video.h"
 
@@ -52,7 +52,7 @@ class Player
 	int freq;
 
 	void PauseAudio(bool val);
-	void Run(IPC& ipc, intptr_t handle);
+	void Run(IpcMessageQueuePtr ipc, intptr_t handle);
 	static void AudioCallback(void *me, Uint8 *stream, int len);
 };
 

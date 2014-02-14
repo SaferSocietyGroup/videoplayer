@@ -9,7 +9,7 @@ sourcedir       src
 ldflags         mconsole
 cflags		std=c++0x Wall
 
-lib-static	        libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl
+lib-static	        libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl libshmipc
 
 # link statically
 ldflags          static-libgcc "Wl,-Bstatic"
