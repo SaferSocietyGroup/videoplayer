@@ -23,12 +23,12 @@
 
 #include <cstdlib>
 
-#include "player.h"
-#include "video.h"
-#include "common.h"
-#include "audiohandler.h"
-#include "flog.h"
-#include "tools.h"
+#include "Player.h"
+#include "Video.h"
+#include "Common.h"
+#include "AudioHandler.h"
+#include "Flog.h"
+#include "Tools.h"
 
 typedef std::pair<std::string, std::string> Message;
 

@@ -25,14 +25,13 @@
 #define WIN32_EXTRA_LEAN
 //#define WRAP_ACCESS_VIOLATION
 
-#include "common.h"
-
-#include "player.h"
-#include "flog.h"
-
 #include <iostream>
 #include <sstream>
 #include <cstdint>
+
+#include "Common.h"
+#include "Player.h"
+#include "Flog.h"
 
 int main_wrap(int argc, char** argv)
 {

@@ -1,6 +1,6 @@
 #include "IpcMessageQueue.h"
-#include "flog.h"
-#include "tools.h"
+#include "Flog.h"
+#include "Tools.h"
 
 #include <libshmipc.h>
 //#include <mutex>

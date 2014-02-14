@@ -21,11 +21,12 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "timehandler.h"
+//#define DEBUG
 
 #include <iostream>
-//#define DEBUG
-#include "avlibs.h"
+
+#include "TimeHandler.h"
+#include "AvLibs.h"
 
 TimeHandler::TimeHandler()
 {

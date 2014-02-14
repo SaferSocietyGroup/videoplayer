@@ -21,14 +21,39 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <SDL.h>
-#include "samplequeue.h"
+#ifndef PLAYER_H
+#define PLAYER_H
 
-void SampleQueue::clear()
+#include <cstdint>
+#include <SDL.h>
+
+#include "IpcMessageQueue.h"
+#include "SampleQueue.h"
+#include "Video.h"
+
+class Player
 {
-	SDL_LockAudio();
-	while(!empty()){
-		pop();
-	}
-	SDL_UnlockAudio();
-}
+	SampleQueue samples;
+
+	void InitAudio();
+	void CloseAudio();
+	void SetDims(int nw, int nh, int vw, int vh);
+
+	bool initialized;
+	int x, y, w, h;
+		
+	float volume;
+	bool mute, qvMute, audioOutputEnabled;
+	SDL_TimerID noAudioTimer;
+	SDL_Surface* screen;
+
+	public:
+	VideoPtr video;
+	int freq;
+
+	void PauseAudio(bool val);
+	void Run(IpcMessageQueuePtr ipc, intptr_t handle);
+	static void AudioCallback(void *me, Uint8 *stream, int len);
+};
+
+#endif

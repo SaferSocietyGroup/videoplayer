@@ -51,7 +51,6 @@ typedef unsigned char byte;
 #define POW2(__x) ((__x) * (__x))
 
 #include <cmath>
-
 #include <algorithm>
 
 #define CLAMP(__MIN, __MAX, __VAL) std::min(std::max((__MIN), (__VAL)),( __MAX))

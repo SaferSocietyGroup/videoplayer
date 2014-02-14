@@ -22,18 +22,17 @@
  */
 
 #define DEBUG
-#include "flog.h"
-#include "audiohandler.h"
 
 #include <algorithm>
-#include <SDL.h>
-
-#include "avlibs.h"
-
-#include "timehandler.h"
-
 #include <queue>
 #include <functional>
+
+#include <SDL.h>
+
+#include "Flog.h"
+#include "AudioHandler.h"
+#include "AvLibs.h"
+#include "TimeHandler.h"
 
 class CAudioHandler : public AudioHandler
 {

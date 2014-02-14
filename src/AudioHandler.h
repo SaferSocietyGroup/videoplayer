@@ -30,8 +30,8 @@
 class AudioHandler;
 typedef std::shared_ptr<AudioHandler> AudioHandlerPtr;
 
-#include "avlibs.h"
-#include "samplequeue.h"
+#include "AvLibs.h"
+#include "SampleQueue.h"
 
 class AudioHandler
 {

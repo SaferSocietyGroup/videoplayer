@@ -29,10 +29,9 @@
 #include <functional>
 #include <memory>
 
-#include "audiohandler.h"
-#include "timehandler.h"
-
-#include "avlibs.h"
+#include "AudioHandler.h"
+#include "TimeHandler.h"
+#include "AvLibs.h"
 
 class Frame
 {

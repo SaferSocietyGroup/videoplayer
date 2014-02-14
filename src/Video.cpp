@@ -35,9 +35,9 @@
 #include <stdexcept>
 #include <iomanip>
 
-#include "video.h"
-#include "flog.h"
-#include "tools.h"
+#include "Video.h"
+#include "Flog.h"
+#include "Tools.h"
 
 class KfPos
 {

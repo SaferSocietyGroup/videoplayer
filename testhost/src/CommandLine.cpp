@@ -1,7 +1,8 @@
-#include "commandline.h"
-#include "log.h"
 #include <iostream>
 #include <sstream>
+
+#include "CommandLine.h"
+#include "Flog.h"
 
 std::queue<std::vector<std::string> > CommandLine::queue;
 SDL_mutex* CommandLine::mutex = 0;

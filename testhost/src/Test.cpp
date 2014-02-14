@@ -1,11 +1,11 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
-#include <flog.h>
 #include <sstream>
 
-#include "tools.h"
-#include "commandline.h"
+#include "Tools.h"
+#include "CommandLine.h"
 #include "IpcMessageQueue.h"
+#include "Flog.h"
 
 #define CMD_REQ(__cmd, __numargs) \
 	if(arg[0] == (__cmd) && arg.size() - 1 != (__numargs)) {\
