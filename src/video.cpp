@@ -36,7 +36,6 @@
 #include <iomanip>
 
 #include "video.h"
-#include "log.h"
 #include "flog.h"
 #include "tools.h"
 
@@ -130,7 +129,7 @@ class CVideo : public Video
 	}
 
 	~CVideo(){
-		LogDebug("destructor");
+		FlogD("destructor");
 
 		closeFile();
 
@@ -249,7 +248,7 @@ class CVideo : public Video
 		frame = std::min(std::max(0, frame), getDurationInFrames());
 		emptyFrameQueue();
 
-		LogExp(duration);
+		FlogExpD(duration);
 		FlogD("Seeking to " << frame << " of " << getDurationInFrames());
 
 		int to = frame;
@@ -266,13 +265,13 @@ class CVideo : public Video
 				// Try to seek with raw byte seeking
 				if(!seekRaw(to)){
 					lastError = ESeeking;
-					LogDebug("seek failed");
+					FlogD("seek failed");
 					return false;
 				}else{
-					LogDebug("used seekRaw");
+					FlogD("used seekRaw");
 				}
 			}else{
-				LogDebug("used seekTs");
+				FlogD("used seekTs");
 			}
 
 			if(exact){
@@ -287,12 +286,12 @@ class CVideo : public Video
 				}
 
 				catch(std::runtime_error e){
-					LogDebug("Error decoding: " << e.what());
+					FlogD("Error decoding: " << e.what());
 					return false;
 				}
 			}
 		}else{
-			LogDebug("used seekKf");
+			FlogD("used seekKf");
 		}
 
 		timeHandler.setTime(lastPts);
@@ -496,7 +495,7 @@ class CVideo : public Video
 			}
 			keyframes.push_back(KfPos(frame, pos, dts));
 		}
-		LogDebug("loaded " << keyframes.size() << " iframes");
+		FlogD("loaded " << keyframes.size() << " iframes");
 	}
 
 	void setPlaybackSpeed(double speed){
@@ -527,7 +526,7 @@ class CVideo : public Video
 						if((ret = av_read_frame(pFormatCtx, &packet)) < 0/* || panic++ > 1024*/){
 							freePacket();
 							lastError = EDemuxing;
-							//LogExp(ret);
+							//FlogExpD(ret);
 							throw std::runtime_error("demuxing");
 						}
 					}while(packet.stream_index != videoStream && packet.stream_index != audioStream);
@@ -544,7 +543,7 @@ class CVideo : public Video
 					if(packet.stream_index == videoStream){
 						// Decode video
 
-						//LogExp(packet.flags & PKT_FLAG_KEY);
+						//FlogExpD(packet.flags & PKT_FLAG_KEY);
 
 						if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame, &frameFinished, &packet)) < 0 )
 						{
@@ -574,9 +573,9 @@ class CVideo : public Video
 
 		catch (std::runtime_error e) 
 		{
-			LogDebug("Error decoding: \"" << e.what() << "\"");
+			FlogD("Error decoding: \"" << e.what() << "\"");
 			if((std::string)e.what() != "audio"){
-				LogDebug("re-throwing");
+				FlogD("re-throwing");
 				throw(e);
 			}
 		}
@@ -604,15 +603,15 @@ class CVideo : public Video
 				}
 			}
 			catch(std::runtime_error e){
-				LogDebug("generated exception");
-				LogExp(e.what());
+				FlogD("generated exception");
+				FlogExpD(e.what());
 				if((std::string)e.what() == "demuxing"){
 					return false;
 				}
 			}
 		}
 
-		LogDebug("couldn't find a video frame in 100 steps");
+		FlogD("couldn't find a video frame in 100 steps");
 		return false;
 	}
 
@@ -645,7 +644,7 @@ class CVideo : public Video
 		double to = (double)frame / (double)getDurationInFrames();
 		int64_t fileSize = avio_size(pFormatCtx->pb);
 		if(av_seek_frame(pFormatCtx, -1, (int64_t)((double)fileSize * to), AVSEEK_FLAG_BYTE) < 0){
-			LogError("Raw seeking error");
+			FlogE("Raw seeking error");
 			return false;
 		}
 
@@ -732,7 +731,7 @@ class CVideo : public Video
 	}
 
 	void locateKeyFrames(){
-		LogDebug("Locating keyframes");
+		FlogD("Locating keyframes");
 
 		duration = 0;
 		keyframes.clear();
@@ -742,8 +741,8 @@ class CVideo : public Video
 		for(;;)
 		{
 			int64_t pos = avio_seek(pFormatCtx->pb, 0, SEEK_CUR);
-			/*LogDebug("  ");
-				LogExp(url_ftell(pFormatCtx->pb));*/
+			/*FlogD("  ");
+				FlogExpD(url_ftell(pFormatCtx->pb));*/
 			int ret = av_read_frame(pFormatCtx, &packet);
 
 			// might not be finished even if the file has reached the end, add to a counter
@@ -775,7 +774,7 @@ class CVideo : public Video
 					if(ins){
 						keyframes.push_back(KfPos(duration, pos, packet.dts));
 					}else{
-						LogDebug("skipping duplicate");
+						FlogD("skipping duplicate");
 					}
 				}
 
@@ -797,10 +796,10 @@ class CVideo : public Video
 		{
 			/* Try to seek to keyframe and decode a videoframe */
 			if(testSeekKf((*it).frame, false) != -1/* && decodeVideoFrame()*/){
-				//LogDebug("kf " << (*it).frame << " seekable, keeping");
+				//FlogD("kf " << (*it).frame << " seekable, keeping");
 				++it;
 			}else{
-				LogDebug("kf unseekable, removing from list");
+				FlogD("kf unseekable, removing from list");
 				it = keyframes.erase(it);
 				removed++;
 			}
@@ -810,7 +809,7 @@ class CVideo : public Video
 			keyframes.push_back(KfPos(0, 0, 0));
 		}
 
-		LogExp(removed);
+		FlogExpD(removed);
 	}
 
 	int testSeekKf(int frame, bool adjust = true){
@@ -827,13 +826,13 @@ class CVideo : public Video
 			closeKf = *it;
 		}
 
-		//LogDebug("kf: " << closeKf.pos << " " << closeKf.frame << " " << closeKf.dts);
+		//FlogD("kf: " << closeKf.pos << " " << closeKf.frame << " " << closeKf.dts);
 
 		int ret = av_seek_frame(pFormatCtx, videoStream, closeKf.dts, AVSEEK_FLAG_ANY);
 		avcodec_flush_buffers(pCodecCtx);
 
 		if(ret < 0){
-			//LogDebug("dts seek failed, trying url_fseek");
+			//FlogD("dts seek failed, trying url_fseek");
 
 			// Use the previous keyframe
 			if(adjust && closeKf.frame != 0){ closeKf = lastKf; }
@@ -847,25 +846,25 @@ class CVideo : public Video
 		for(int i = 0; i < 1000; i++){
 			ret = av_read_frame(pFormatCtx, &packet);
 			if(ret < 0){
-				LogDebug("read frame failed");
+				FlogD("read frame failed");
 				freePacket();
 				return -1;
 			}
 
 			if(packet.flags & AV_PKT_FLAG_KEY){
-				//LogDebug("Found kf after " << i << " steps");
+				//FlogD("Found kf after " << i << " steps");
 				return closeKf.frame;
 			}
 
 			freePacket();
 		}
 
-		LogDebug("Couldn't find kf after 1000 steps, failing");
+		FlogD("Couldn't find kf after 1000 steps, failing");
 		return -1;
 	}
 
 	bool openFile(AudioCallback audioCallback, int freq, int channels){
-		LogInfo("Trying to load file: " << filename);
+		FlogI("Trying to load file: " << filename);
 
 		int ret;
 
@@ -873,15 +872,15 @@ class CVideo : public Video
 		if((ret = avformat_open_input(&pFormatCtx, filename.c_str(), NULL, NULL)) != 0){
 			char ebuf[512];
 			av_strerror(ret, ebuf, sizeof(ebuf));
-			LogError("couldn't open file");
-			LogError(ebuf);
+			FlogE("couldn't open file");
+			FlogE(ebuf);
 			lastError = EFile;
 			return false;
 		}
 
 		/* Get stream information */
 		if(avformat_find_stream_info(pFormatCtx, NULL) < 0){
-			LogError("couldn't get stream info");
+			FlogE("couldn't get stream info");
 			lastError = EStreamInfo;
 			return false;
 		}
@@ -909,7 +908,7 @@ class CVideo : public Video
 		}
 
 		if(videoStream == -1){
-			LogError("couldn't find stream");
+			FlogE("couldn't find stream");
 			lastError = EStream;
 			return false;
 		}	
@@ -920,21 +919,21 @@ class CVideo : public Video
 		if(audioStream != -1){
 			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioCallback, freq, channels);
 		}else{
-			LogDebug("no audio stream");
+			FlogD("no audio stream");
 		}
 
 		/* Find the decoder for the video stream */
 		pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
 
 		if(!pCodec){
-			LogError("unsupported codec");
+			FlogE("unsupported codec");
 			lastError = EVideoCodec;
 			return false;
 		}
 
 		// Open codec
 		if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0){
-			LogError("unsupported codec");
+			FlogE("unsupported codec");
 			lastError = EVideoCodec;
 			return false;
 		}
@@ -1020,17 +1019,17 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 		/* HACK, can we extract this information from the headers structures somehow? */
 
 		if(!strcmp(fmt, "DRM protected stream detected, decoding will likely fail!\n")){
-			LogInfo("DRM protected stream");
+			FlogI("DRM protected stream");
 			CVideo::drm = true;
 		}
 
 		else if(!strcmp(fmt, "Ext DRM protected stream detected, decoding will likely fail!\n")){
-			LogInfo("Ext DRM protected stream");
+			FlogI("Ext DRM protected stream");
 			CVideo::drm = true;
 		}
 
 		else if(!strcmp(fmt, "Digital signature detected, decoding will likely fail!\n")){
-			LogInfo("Digitally signed stream");
+			FlogI("Digitally signed stream");
 			CVideo::drm = true;
 		}
 	}
@@ -1039,7 +1038,7 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 		char tmp[1024];
 		vsprintf(tmp, fmt, vargs);
 
-		LogDebug("ffmpeg says: " << tmp);
+		FlogD("ffmpeg says: " << tmp);
 	}
 }
 

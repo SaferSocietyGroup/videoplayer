@@ -22,7 +22,7 @@
  */
 
 #define DEBUG
-#include "log.h"
+#include "flog.h"
 #include "audiohandler.h"
 
 #include <algorithm>
@@ -66,7 +66,7 @@ class CAudioHandler : public AudioHandler
 
 		if(!aCodec || avcodec_open2(aCodecCtx, aCodec, NULL) < 0)
 		{
-			LogError("unsupported audio codec");
+			FlogE("unsupported audio codec");
 			return;
 		}
 

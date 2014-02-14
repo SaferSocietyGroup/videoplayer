@@ -25,7 +25,6 @@
 
 #include <iostream>
 //#define DEBUG
-#include "log.h"
 #include "avlibs.h"
 
 TimeHandler::TimeHandler()

@@ -29,7 +29,6 @@
 
 #include "player.h"
 #include "flog.h"
-#include "log.h"
 
 #include <iostream>
 #include <sstream>
