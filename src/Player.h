@@ -37,7 +37,6 @@ class Player
 
 	void InitAudio();
 	void CloseAudio();
-	void SetDims(int nw, int nh, int vw, int vh);
 
 	bool initialized;
 	int x, y, w, h;
@@ -51,6 +50,7 @@ class Player
 	VideoPtr video;
 	int freq;
 
+	void AddVideoTime(double t);
 	void PauseAudio(bool val);
 	void Run(IpcMessageQueuePtr ipc, intptr_t handle);
 	static void AudioCallback(void *me, Uint8 *stream, int len);

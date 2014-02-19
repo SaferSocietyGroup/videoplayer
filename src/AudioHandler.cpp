@@ -76,7 +76,7 @@ class CAudioHandler : public AudioHandler
 	~CAudioHandler()
 	{
 		if(aCodecCtx){
-			avcodec_close(aCodecCtx);
+			//avcodec_close(aCodecCtx);
 		}
 
 		if(dstBuf)

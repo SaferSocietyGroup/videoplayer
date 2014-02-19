@@ -949,6 +949,11 @@ class CVideo : public Video
 	}
 
 	void closeFile(){
+		// trigger the AudioHandler destructor by dropping the reference, so that it frees the audio codec before
+		// the format context is freed
+
+		//audioHandler = 0;
+
 		freePacket();
 
 		if(pCodecCtx)
@@ -998,15 +1003,23 @@ class CVideo : public Video
 	}
 
 	bool getPaused(){
-		return timeHandler.getPaused();
+		SDL_LockAudio();
+		bool ret = timeHandler.getPaused();
+		SDL_UnlockAudio();
+		return ret;
 	}
 
 	void addTime(double t){
+		SDL_LockAudio();
 		timeHandler.addTime(t);
+		SDL_UnlockAudio();
 	}
 	
 	double getTime(){
-		return timeHandler.getTime();
+		SDL_LockAudio();
+		double ret = timeHandler.getTime();
+		SDL_UnlockAudio();
+		return ret;
 	}
 };
 
