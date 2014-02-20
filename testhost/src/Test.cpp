@@ -38,8 +38,6 @@ int main(int argc, char** argv)
 
 	CommandLine::Start();
 
-	//SDL_Surface* surface = 0;
-
 	while(!done){
 		SDL_Event event;
 		while(SDL_PollEvent(&event)){
@@ -123,7 +121,7 @@ int main(int argc, char** argv)
 						FlogD("got unhandled message type: " << type << " data: " << std::string(buffer, size));
 					}
 				}
-		});
+		}, 10);
 
 		SDL_Delay(1);
 	}

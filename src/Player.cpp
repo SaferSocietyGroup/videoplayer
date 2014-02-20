@@ -86,7 +86,8 @@ Uint32 AudioFallbackTimer(Uint32 interval, void* data)
 
 void Player::PauseAudio(bool val)
 {
-	if(!audioOutputEnabled) return;
+	if(!audioOutputEnabled)
+		return;
 
 	if(!val) InitAudio();
 	else CloseAudio();
@@ -173,19 +174,23 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 	bool quickViewPlayer = false;
 
 	InitAudio();	
+	PauseAudio(true);
 
-	x = y = w = h = 0;
+	x = y = 0;
+	w = screen->w;
+	h = screen->h;
 	freq = 48000;
 
 	SDL_Overlay* overlay = 0;
 
 	while(running){
+		//int t = SDL_GetTicks();
+
 		SDL_Event event;
 		while(SDL_PollEvent(&event)){
 			if(event.type == SDL_QUIT)
 				running = false;
 		}
-
 
 		for(unsigned int i = 0; i < sendQueue.size(); i++){
 			if(ipc->WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
@@ -326,6 +331,8 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					s >> y;
 					s >> w;
 					s >> h;
+					FlogExpD(w);
+					FlogExpD(h);
 					SDL_FillRect(screen, 0, 0);
 				}
 
@@ -360,6 +367,8 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				}
 			}
 		}
+
+		//FlogExpD(SDL_GetTicks() - t);
 
 		if(video){
 			video->tick();
