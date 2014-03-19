@@ -341,9 +341,10 @@ class CVideo : public Video
 				reachedEof++;
 				if(IsEof()){
 					FlogExpD(reachedEof);
-				}else{
-					FlogD("demuxer failed, trying again");
 				}
+				//}else{
+				//	FlogD("demuxer failed, trying again");
+				//}
 			}
 		}
 	}
@@ -928,42 +929,34 @@ class CVideo : public Video
 			return false;
 		}
 
-		// Find the first video stream
-		audioStream = videoStream = -1;
+		// find the best audio and video streams
+		audioStream = videoStream = AVERROR_STREAM_NOT_FOUND;
+		pCodec = 0;
 
-		for(unsigned int i = 0; i < pFormatCtx->nb_streams; i++){
-			if(pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_VIDEO && videoStream == -1) {
-				videoStream=i;
-			}
+		videoStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_VIDEO, -1, -1, &pCodec, 0);
 
-			if(pFormatCtx->streams[i]->codec->codec_type == AVMEDIA_TYPE_AUDIO && audioStream == -1) {
-				audioStream=i;
-			}
-		}
-
-		if(videoStream == -1){
+		if(videoStream == AVERROR_STREAM_NOT_FOUND){
 			LogError("couldn't find stream");
 			lastError = EStream;
 			return false;
 		}	
-
-		/* Get a pointer to the codec context for the video stream */
-		pCodecCtx = pFormatCtx->streams[videoStream]->codec;
-
-		if(audioStream != -1){
-			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioCallback, freq, channels);
-		}else{
-			LogDebug("no audio stream");
-		}
-
-		/* Find the decoder for the video stream */
-		pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
-
-		if(!pCodec){
+		
+		if(videoStream == AVERROR_DECODER_NOT_FOUND || !pCodec){
 			LogError("unsupported codec");
 			lastError = EVideoCodec;
 			return false;
 		}
+
+		audioStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
+
+		if(audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND){
+			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioCallback, freq, channels);
+		}else{
+			LogDebug("no audio stream or unsupported audio codec");
+		}
+		
+		/* Get a pointer to the codec context for the video stream */
+		pCodecCtx = pFormatCtx->streams[videoStream]->codec;
 
 		// Open codec
 		if(avcodec_open2(pCodecCtx, pCodec, NULL) < 0){
@@ -995,7 +988,7 @@ class CVideo : public Video
 	}
 
 	bool IsEof(){
-		return reachedEof > 10;
+		return reachedEof > 100;
 	}
 
 	// frame = frame number
