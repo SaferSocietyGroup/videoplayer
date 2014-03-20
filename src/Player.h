@@ -42,7 +42,7 @@ class Player
 	int x, y, w, h;
 		
 	float volume;
-	bool mute, qvMute, audioOutputEnabled;
+	bool mute, quickViewPlayer, audioOutputEnabled;
 	SDL_TimerID noAudioTimer;
 	SDL_Surface* screen;
 

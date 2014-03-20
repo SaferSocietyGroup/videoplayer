@@ -54,7 +54,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 				extraTime += adjust;
 		
 			for(int j = 0; j < 2; j++){
-				s.chn[j] = (me->mute || me->qvMute) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
+				s.chn[j] = (me->mute || me->quickViewPlayer) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
 			}
 
 			stream[i+0] = s.chn[0] & 0xff;
@@ -167,11 +167,12 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 	initialized = false;
 	std::queue<Message> sendQueue;
 
-	mute = qvMute = false;
+	quickViewPlayer = mute = false;
 	volume = 1;
 
 	bool running = true;
-	bool quickViewPlayer = false;
+	bool redraw = true;
+	bool active = false;
 
 	InitAudio();	
 	PauseAudio(true);
@@ -202,6 +203,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 
 		int timeout = video && !video->getPaused() ? 8 : 100;
 		while(ipc->ReadMessage(type, message, timeout)){
+			FlogExpD(type);
 			if(type == "load"){
 				SDL_LockAudio();
 
@@ -212,8 +214,8 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					[&](Video::Error error, const std::string& msg){
 						if(error < Video::EEof)
 							ipc->WriteMessage("error", msg);
-						//else
-							//ipc->WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
+						else
+							ipc->WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
 					},
 					// audio handler
 					[&](const Sample* buffer, int size){
@@ -232,20 +234,21 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 			
 			else if(type == "setquickviewplayer"){
 				quickViewPlayer = (message == "true");
+				FlogExpD(quickViewPlayer);
 			}
 
 			else if(type == "quit"){
 				running = false;
 			}
 
+			else if(type == "setactive"){
+				active = (message == "true");
+				FlogExpD(active);
+			}
+
 			if(video){
 				std::stringstream s(message);
 				
-				if(type == "qvmute"){
-					FlogD(type);
-					qvMute = (message == "true");
-				}
-
 				if(type == "mute"){
 					FlogD(type);
 					FlogExpD(message == "true");
@@ -333,7 +336,9 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					s >> h;
 					FlogExpD(w);
 					FlogExpD(h);
-					SDL_FillRect(screen, 0, 0);
+
+					if(active)
+						SDL_FillRect(screen, 0, 0);
 				}
 
 				else if(type == "snapshot"){
@@ -370,61 +375,64 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 
 		//FlogExpD(SDL_GetTicks() - t);
 
-		if(video){
-			video->tick();
-			video->adjustTime();
+		if(active){
+			if(video){
+				video->tick();
+				video->adjustTime();
 
-			Frame frame = video->fetchFrame();
+				Frame frame = video->fetchFrame();
 
-			if(frame.avFrame){
-				int vw = video->getWidth();
-				int vh = video->getHeight();
+				if(frame.avFrame){
+					int vw = video->getWidth();
+					int vh = video->getHeight();
 
-				// if there's an overlay that doesn't match the video dimensions, delete it
-				if(overlay != 0 && (overlay->w != vw || vh != video->getHeight())){
-					SDL_FreeYUVOverlay(overlay);
-					overlay = 0;
+					// if there's an overlay that doesn't match the video dimensions, delete it
+					if(overlay != 0 && (overlay->w != vw || vh != video->getHeight())){
+						SDL_FreeYUVOverlay(overlay);
+						overlay = 0;
+					}
+
+					// if there's no overlay, create one that matches the video dimensions
+					if(overlay == 0)
+						overlay = SDL_CreateYUVOverlay(vw, vh, SDL_YV12_OVERLAY, screen);
+
+					// write framedata to overlay
+					SDL_LockYUVOverlay(overlay);
+					video->frameToOverlay(frame, overlay->pixels, vw, vh);
+					SDL_UnlockYUVOverlay(overlay);
 				}
+			}
+			
+			// if the screen surface is smaller than the requested output size, resize the screen surface
+			if(screen->w < x + w || screen->h < y + h){
+				//SDL_FreeSurface(screen);
+				FlogD("resizing screen surface");
+				screen = SDL_SetVideoMode(x + w, y + h, 0, SDL_RESIZABLE);
+				FlogAssert(screen, "could not create screen");
+			}
+				
+			if(overlay != 0){
+				int vw = overlay->w;
+				int vh = overlay->h;
 
-				// if there's no overlay, create one that matches the video dimensions
-				if(overlay == 0)
-					overlay = SDL_CreateYUVOverlay(vw, vh, SDL_YV12_OVERLAY, screen);
+				int nw = std::max(std::min(w, 1920), 64);
+				int nh = std::max(std::min(h, 1080), 64);
 
-				// write framedata to overlay
-				SDL_LockYUVOverlay(overlay);
-				video->frameToOverlay(frame, overlay->pixels, vw, vh);
-				SDL_UnlockYUVOverlay(overlay);
+				// Keep aspect ratio
+				float zoom = std::min((float)nw / (float)vw, (float)nh / (float)vh);
+
+				nw = (float)vw * zoom;
+				nh = (float)vh * zoom;
+
+				SDL_Rect r = {(int16_t)(x - (nw - w) / 2), (int16_t)(y - (nh - h) / 2), (uint16_t)nw, (uint16_t)nh};
+				SDL_DisplayYUVOverlay(overlay, &r);
+			}
+				
+			if(redraw){
+				SDL_Flip(screen);
+				redraw = false;
 			}
 		}
-		
-		// if the screen surface is smaller than the requested output size, resize the screen surface
-		if(screen->w < x + w || screen->h < y + h){
-			//SDL_FreeSurface(screen);
-			FlogD("resizing screen surface");
-			screen = SDL_SetVideoMode(x + w, y + h, 0, SDL_RESIZABLE);
-			FlogAssert(screen, "could not create screen");
-		}
-			
-		if(overlay != 0){
-			int vw = overlay->w;
-			int vh = overlay->h;
-
-			int nw = std::max(std::min(w, 1920), 64);
-			int nh = std::max(std::min(h, 1080), 64);
-
-			// Keep aspect ratio
-			float zoom = std::min((float)nw / (float)vw, (float)nh / (float)vh);
-
-			nw = (float)vw * zoom;
-			nh = (float)vh * zoom;
-
-			SDL_Rect r = {(int16_t)(x - (nw - w) / 2), (int16_t)(y - (nh - h) / 2), (uint16_t)nw, (uint16_t)nh};
-			SDL_DisplayYUVOverlay(overlay, &r);
-		}
-			
-		SDL_Flip(screen);
-
-		//Sleep(1);
 	}
 
 	CloseAudio();
