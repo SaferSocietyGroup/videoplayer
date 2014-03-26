@@ -229,6 +229,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 
 				if(video){
 					FlogD("loaded");
+					ipc->WriteMessage("loaded", "");
 				}
 			}
 			
@@ -400,6 +401,8 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					SDL_LockYUVOverlay(overlay);
 					video->frameToOverlay(frame, overlay->pixels, vw, vh);
 					SDL_UnlockYUVOverlay(overlay);
+
+					ipc->WriteMessage("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
 				}
 			}
 			
