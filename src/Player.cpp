@@ -173,13 +173,14 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 	bool running = true;
 	bool redraw = true;
 	bool active = false;
+	bool clearScreen = false;
 
 	InitAudio();	
 	PauseAudio(true);
 
 	x = y = 0;
-	w = screen->w;
-	h = screen->h;
+	winw = w = screen->w;
+	winh = h = screen->h;
 	freq = 48000;
 
 	SDL_Overlay* overlay = 0;
@@ -331,15 +332,21 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				}
 
 				else if(type == "setdims"){
+					s >> winw;
+					s >> winh;
 					s >> x;
 					s >> y;
 					s >> w;
 					s >> h;
+
+					FlogExpD(winw);
+					FlogExpD(winh);
+					FlogExpD(x);
+					FlogExpD(y);
 					FlogExpD(w);
 					FlogExpD(h);
 
-					if(active)
-						SDL_FillRect(screen, 0, 0);
+					clearScreen = true;
 				}
 
 				else if(type == "snapshot"){
@@ -407,10 +414,10 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 			}
 			
 			// if the screen surface is smaller than the requested output size, resize the screen surface
-			if(screen->w < x + w || screen->h < y + h){
+			if(screen->w < winw || screen->h < winh){
 				//SDL_FreeSurface(screen);
 				FlogD("resizing screen surface");
-				screen = SDL_SetVideoMode(x + w, y + h, 0, SDL_RESIZABLE);
+				screen = SDL_SetVideoMode(winw + 100, winh + 100, 0, SDL_RESIZABLE);
 				FlogAssert(screen, "could not create screen");
 			}
 				
@@ -430,8 +437,13 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				SDL_Rect r = {(int16_t)(x - (nw - w) / 2), (int16_t)(y - (nh - h) / 2), (uint16_t)nw, (uint16_t)nh};
 				SDL_DisplayYUVOverlay(overlay, &r);
 			}
-				
-			if(redraw){
+
+			if(redraw || clearScreen){
+				if(clearScreen){
+					SDL_FillRect(screen, 0, 0);
+					clearScreen = false;
+				}
+
 				SDL_Flip(screen);
 				redraw = false;
 			}

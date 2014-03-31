@@ -40,6 +40,7 @@ class Player
 
 	bool initialized;
 	int x, y, w, h;
+	int winw, winh;
 		
 	float volume;
 	bool mute, quickViewPlayer, audioOutputEnabled;
