@@ -50,25 +50,25 @@ int main(int argc, char** argv)
 		if((arg = CommandLine::GetCommand()).size() > 0){
 			if(arg[0] == "exit"){
 				done = true;
-				ipc->WriteMessage("quit");
+				ipc->WritePacket("quit");
 			}
 
-			CMD_REQ("volume", 1) ipc->WriteMessage("volume", arg[1]);
-			else CMD_REQ("qvmute", 1) ipc->WriteMessage("qvmute", arg[1]);
-			else CMD_REQ("mute", 1) ipc->WriteMessage("mute", arg[1]);
-			else CMD_REQ("load", 1) ipc->WriteMessage("load", arg[1]);
-			else CMD_REQ("play", 0) ipc->WriteMessage("play", ""); 
-			else CMD_REQ("pause", 0) ipc->WriteMessage("pause", ""); 
-			else CMD_REQ("getinfo", 0) ipc->WriteMessage("getinfo", ""); 
-			else CMD_REQ("setdims", 1) ipc->WriteMessage("setdims", arg.at(1));
-			else CMD_REQ("seek", 1) ipc->WriteMessage("seek", arg.at(1));
-			else CMD_REQ("step", 1) ipc->WriteMessage("step", arg.at(1));
-			else CMD_REQ("snapshot", 0) ipc->WriteMessage("snapshot", "");
-			else CMD_REQ("getkeyframes", 0) ipc->WriteMessage("getkeyframes", "");
-			else CMD_REQ("setkeyframes", 1) ipc->WriteMessage("getkeyframes", arg.at(1));
-			else CMD_REQ("setplaybackspeed", 1) ipc->WriteMessage("setplaybackspeed", arg.at(1));
-			else CMD_REQ("setquickviewplayer", 1) ipc->WriteMessage("setquickviewplayer", arg.at(1));
-			else CMD_REQ("setactive", 1) ipc->WriteMessage("setactive", arg.at(1));
+			CMD_REQ("volume", 1) ipc->WritePacket("volume", arg[1]);
+			else CMD_REQ("qvmute", 1) ipc->WritePacket("qvmute", arg[1]);
+			else CMD_REQ("mute", 1) ipc->WritePacket("mute", arg[1]);
+			else CMD_REQ("load", 1) ipc->WritePacket("load", arg[1]);
+			else CMD_REQ("play", 0) ipc->WritePacket("play", ""); 
+			else CMD_REQ("pause", 0) ipc->WritePacket("pause", ""); 
+			else CMD_REQ("getinfo", 0) ipc->WritePacket("getinfo", ""); 
+			else CMD_REQ("setdims", 1) ipc->WritePacket("setdims", arg.at(1));
+			else CMD_REQ("seek", 1) ipc->WritePacket("seek", arg.at(1));
+			else CMD_REQ("step", 1) ipc->WritePacket("step", arg.at(1));
+			else CMD_REQ("snapshot", 0) ipc->WritePacket("snapshot", "");
+			else CMD_REQ("getkeyframes", 0) ipc->WritePacket("getkeyframes", "");
+			else CMD_REQ("setkeyframes", 1) ipc->WritePacket("getkeyframes", arg.at(1));
+			else CMD_REQ("setplaybackspeed", 1) ipc->WritePacket("setplaybackspeed", arg.at(1));
+			else CMD_REQ("setquickviewplayer", 1) ipc->WritePacket("setquickviewplayer", arg.at(1));
+			else CMD_REQ("setactive", 1) ipc->WritePacket("setactive", arg.at(1));
 
 			else CMD_REQ("host_suspend", 1)
 				SDL_Delay(atof(arg.at(1).c_str()) * 1000.0f);
@@ -76,7 +76,20 @@ int main(int argc, char** argv)
 			else FlogE("no such command: " << arg[0]);
 		}
 
+		std::string type, pkt;
+		while(ipc->ReadPacket(type, pkt)){
+					if (type == "position"){
+						if((positionCounter++) % 10 == 0)
+							FlogD("pos: " << pkt);
+					}
 
+					else{
+						FlogExpD(type);
+						FlogExpD(pkt);
+					}
+		}
+
+#if 0
 		ipc->GetReadBuffer([&](const std::string& type, const char* buffer, size_t size) {
 				if(buffer){
 					if(type == "frame"){
@@ -100,7 +113,7 @@ int main(int argc, char** argv)
 					}
 
 					else if(type == "keepalive"){
-						ipc->WriteMessage("keepalive", "");
+						ipc->WritePacket("keepalive", "");
 						FlogD("keepalive");
 					}
 
@@ -123,6 +136,7 @@ int main(int argc, char** argv)
 					}
 				}
 		}, 10);
+#endif
 
 		SDL_Delay(1);
 	}

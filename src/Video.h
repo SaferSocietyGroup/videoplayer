@@ -66,6 +66,8 @@ class Video
 	
 	typedef std::function<void(Error, const std::string&)> ErrorCallback;
 	typedef std::function<void(const Sample* buffer, int size)> AudioCallback;
+	
+	virtual ~Video(){};
 
 	virtual Frame fetchFrame() = 0;
 	virtual void adjustTime() = 0;

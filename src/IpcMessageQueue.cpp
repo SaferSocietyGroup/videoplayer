@@ -7,6 +7,7 @@
 
 class CIpcMessageQueue : public IpcMessageQueue {
 	shmipc* readQueue, *writeQueue;
+	shmstream* stream;
 	//std::mutex readLock, writeLock;
 
 	public:
@@ -31,6 +32,9 @@ class CIpcMessageQueue : public IpcMessageQueue {
 			err = shmipc_open(readName.c_str(), SHMIPC_AM_READ, &readQueue);
 			AssertEx(err == SHMIPC_ERR_SUCCESS, IpcEx, "could not open writer");
 		}
+
+		auto err = shmstream_open_from(readQueue, writeQueue, &stream);
+		AssertEx(err == SHMIPC_ERR_SUCCESS, IpcEx, "could not create stream");
 	}
 
 	bool ReadMessage(std::string& type, std::string& message, int timeout) {
@@ -102,6 +106,36 @@ class CIpcMessageQueue : public IpcMessageQueue {
 
 	int GetWriteQueueSize(){
 		return shmipc_get_buffer_size(writeQueue);
+	}
+	
+	void WritePacket(const std::string& type, const std::string& packet)
+	{
+		AssertEx(type.length() < SHMIPC_MESSAGE_TYPE_LENGTH, IpcEx, "type too long (" << type.length() << " / " << SHMIPC_MESSAGE_TYPE_LENGTH << ")"); 
+		shmipc_error err = shmstream_write_pkt(stream, type.c_str(), packet.c_str(), packet.length());
+		AssertEx(err == SHMIPC_ERR_SUCCESS, IpcEx, "failed to write packet");
+	}
+
+	bool ReadPacket(std::string& type, std::string& packet)
+	{
+		char* pkt;
+		size_t size;
+		char t[SHMIPC_MESSAGE_TYPE_LENGTH];
+
+		shmipc_error err = shmstream_read_pkt(stream, t, &pkt, &size);
+
+		if(err == SHMIPC_ERR_NO_DATA)
+			return false;
+
+		AssertEx(err == SHMIPC_ERR_SUCCESS, IpcEx, "failed to write packet");
+
+		type.assign(t);
+
+		if(size > 0){
+			packet.assign(pkt, size);
+			shmipc_free(pkt);
+		}
+
+		return true;
 	}
 
 	~CIpcMessageQueue(){

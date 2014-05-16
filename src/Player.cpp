@@ -195,15 +195,16 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 		}
 
 		for(unsigned int i = 0; i < sendQueue.size(); i++){
-			if(ipc->WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
-				sendQueue.pop();
-			}
+			// TODO background thread?
+			//ipc->WritePacket(sendQueue.front().first, sendQueue.front().second /*, 1*/)){
+			//	sendQueue.pop();
+			
+			ipc->WritePacket(sendQueue.front().first, sendQueue.front().second);
 		}
 
 		std::string type, message;
 
-		int timeout = video && !video->getPaused() ? 8 : 100;
-		while(ipc->ReadMessage(type, message, timeout)){
+		while(ipc->ReadPacket(type, message)){
 			FlogExpD(type);
 			if(type == "load"){
 				SDL_LockAudio();
@@ -214,9 +215,9 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					// error handler
 					[&](Video::Error error, const std::string& msg){
 						if(error < Video::EEof)
-							ipc->WriteMessage("error", msg);
+							ipc->WritePacket("error", msg);
 						else
-							ipc->WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
+							ipc->WritePacket(error == Video::EEof ? "eof" : "unloaded", msg);
 					},
 					// audio handler
 					[&](const Sample* buffer, int size){
@@ -230,7 +231,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 
 				if(video){
 					FlogD("loaded");
-					ipc->WriteMessage("loaded", "");
+					ipc->WritePacket("loaded", "");
 				}
 			}
 			
@@ -287,7 +288,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				}
 
 				else if(type == "getkeyframes"){
-					ipc->WriteMessage("keyframes", video->getIFrames());
+					ipc->WritePacket("keyframes", video->getIFrames());
 				}
 
 				else if(type == "play") {
@@ -303,18 +304,18 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				}
 
 				else if(type == "getinfo") {
-					ipc->WriteMessage("dimensions", Str(video->getWidth() << " " << Str(video->getHeight())));
-					ipc->WriteMessage("videocodec", video->getVideoCodecName());
-					ipc->WriteMessage("format", video->getFormat());
-					ipc->WriteMessage("duration_in_frames", Str(video->getDurationInFrames()));
-					ipc->WriteMessage("reported_duration_in_frames", Str(video->getReportedDurationInFrames()));
-					ipc->WriteMessage("framerate", Str(video->getFrameRate()));
-					ipc->WriteMessage("reported_framerate", Str(video->getReportedFrameRate()));					
-					ipc->WriteMessage("aspectratio", Str(video->getAspect()));
-					ipc->WriteMessage("reported_length_in_secs", Str(video->getReportedDurationInSecs()));
-					ipc->WriteMessage("length_in_secs", Str(video->getDurationInSecs()));
-					ipc->WriteMessage("sample_rate", Str(video->getSampleRate()));
-					ipc->WriteMessage("audio_num_channels", Str(video->getNumChannels()));
+					ipc->WritePacket("dimensions", Str(video->getWidth() << " " << Str(video->getHeight())));
+					ipc->WritePacket("videocodec", video->getVideoCodecName());
+					ipc->WritePacket("format", video->getFormat());
+					ipc->WritePacket("duration_in_frames", Str(video->getDurationInFrames()));
+					ipc->WritePacket("reported_duration_in_frames", Str(video->getReportedDurationInFrames()));
+					ipc->WritePacket("framerate", Str(video->getFrameRate()));
+					ipc->WritePacket("reported_framerate", Str(video->getReportedFrameRate()));					
+					ipc->WritePacket("aspectratio", Str(video->getAspect()));
+					ipc->WritePacket("reported_length_in_secs", Str(video->getReportedDurationInSecs()));
+					ipc->WritePacket("length_in_secs", Str(video->getDurationInSecs()));
+					ipc->WritePacket("sample_rate", Str(video->getSampleRate()));
+					ipc->WritePacket("audio_num_channels", Str(video->getNumChannels()));
 				}
 
 				else if(type == "step"){
@@ -376,7 +377,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 			// !video
 			else {
 				if(type == "getkeyframes"){
-					ipc->WriteMessage("keyframes", "error");
+					ipc->WritePacket("keyframes", "error");
 				}
 			}
 		}
@@ -409,7 +410,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 					video->frameToOverlay(frame, overlay->pixels, vw, vh);
 					SDL_UnlockYUVOverlay(overlay);
 
-					ipc->WriteMessage("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
+					ipc->WritePacket("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
 				}
 			}
 			
@@ -448,6 +449,8 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				redraw = false;
 			}
 		}
+		
+		SDL_Delay(video && !video->getPaused() ? 8 : 100);
 	}
 
 	CloseAudio();
