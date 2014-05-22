@@ -351,26 +351,30 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 				}
 
 				else if(type == "snapshot"){
-#if 0
-					FlogD("got a snapshot");
-					char* buffer = ipc->GetWriteBuffer();
-
+					FlogD("snapshot");
+					Frame currentFrame = video->getCurrentFrame();
+					
 					uint16_t w = video->getWidth(), h = video->getHeight();
+					
+					size_t bufferSize = avpicture_get_size(PIX_FMT_BGR24, w, h) + 4;
+					char* buffer = (char*)av_malloc(bufferSize);
 
 					*((uint16_t*)buffer) = w;
 					*(((uint16_t*)buffer) + 1) = h;
 
-					Frame currentFrame = video->getCurrentFrame();
-
 					if(currentFrame.avFrame){
 						FlogD("snapshot w: " << w << " h: " << h);
-						video->frameToSurface(currentFrame, (uint8_t*)buffer + 4, w, h);
-						ipc->ReturnWriteBuffer("snapshot", &buffer, w * h * 3 + 4);
+
+						uint8_t* buffers[] = {(uint8_t*)buffer + 4};
+						video->frameToOverlay(currentFrame, Video::FRGB24, buffers, w, h);
+						ipc->WritePacket("snapshot", std::string(buffer, bufferSize));
+
 						FlogD("sent snapshot data");
 					} else {
 						FlogW("no frame to send");
 					}
-#endif
+
+					av_free(buffer);
 				}
 			}
 
@@ -407,7 +411,7 @@ void Player::Run(IpcMessageQueuePtr ipc, intptr_t handle)
 
 					// write framedata to overlay
 					SDL_LockYUVOverlay(overlay);
-					video->frameToOverlay(frame, overlay->pixels, vw, vh);
+					video->frameToOverlay(frame, Video::FYUV420P, overlay->pixels, vw, vh);
 					SDL_UnlockYUVOverlay(overlay);
 
 					ipc->WritePacket("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));

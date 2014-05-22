@@ -1,6 +1,7 @@
 #include <SDL.h>
 #include <SDL_syswm.h>
 #include <sstream>
+#include <fstream>
 
 #include "Tools.h"
 #include "CommandLine.h"
@@ -81,6 +82,12 @@ int main(int argc, char** argv)
 					if (type == "position"){
 						if((positionCounter++) % 10 == 0)
 							FlogD("pos: " << pkt);
+					}
+
+					else if(type == "snapshot"){
+						std::ofstream s("snapshot.raw", std::ios::binary);
+						s.write(pkt.c_str(), pkt.size());
+						s.close();
 					}
 
 					else{

@@ -200,11 +200,11 @@ class CVideo : public Video
 			//timeHandler.setTime(pts);
 		}
 	}
-
+	
 	/* Decode frame, convert to RGB and put on given surface with given dimensions */
 	/* Note: this method must be called on each fetched frame or the decoding won't progress */
 	/* TODO: this function has tons of side effects and really shouldn't work like it does */
-	void frameToOverlay(Frame newFrame, uint8_t** buffers, int w, int h, int sw, int sh){
+	void frameToOverlay(Frame newFrame, PxFmt fmt, uint8_t* const* buffers, int w, int h, int sw, int sh){
 		if(!newFrame.avFrame)
 			return;
 		
@@ -221,15 +221,26 @@ class CVideo : public Video
 		}
 
 		//PixelFormat fffmt = bitmap.bytesPerPixel == 4 ? PIX_FMT_BGRA : PIX_FMT_BGR24;
-		PixelFormat fffmt = PIX_FMT_YUV420P;
 
-		int avret = avpicture_fill(&pict, NULL, fffmt, sw, sh);
+		PixelFormat fffmt;
+		int avret;
+
+		if(fmt == FYUV420P){
+			fffmt = PIX_FMT_YUV420P;
+			avret = avpicture_fill(&pict, NULL, fffmt, sw, sh);
+
+			pict.data[0] = buffers[0];
+			pict.data[1] = buffers[2];
+			pict.data[2] = buffers[1];
+		}
+
+		else{
+			fffmt = PIX_FMT_BGR24;
+			avret = avpicture_fill(&pict, buffers[0], fffmt, sw, sh);
+		}
+		
 		if(avret < 0)
 			throw std::runtime_error(Str("avpicture_fill error: " << avret));
-
-		pict.data[0] = buffers[0];
-		pict.data[1] = buffers[2];
-		pict.data[2] = buffers[1];
 			 
 		struct SwsContext* swsCtx = sws_getContext(pCodecCtx->width, pCodecCtx->height, 
 			pCodecCtx->pix_fmt, w, h, fffmt, SWS_BILINEAR, NULL, NULL, NULL);
