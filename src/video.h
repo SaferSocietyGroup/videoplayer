@@ -68,6 +68,8 @@ class Video
 	typedef std::function<void(Error, const std::string&)> ErrorCallback;
 	typedef std::function<void(const Sample* buffer, int size)> AudioCallback;
 
+	virtual ~Video(){};
+
 	virtual Frame fetchFrame() = 0;
 	virtual void adjustTime() = 0;
 	virtual void frameToSurface(Frame frame, uint8_t* buffer, int w = 0, int h = 0, int sw = 0, int sh = 0) = 0;
