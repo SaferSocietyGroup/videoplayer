@@ -278,7 +278,10 @@ void Player::Run(IPC& ipc)
 				else if(type == "unload")
 				{
 					FlogD(type);
-					video = 0;
+					if(video)
+						video = 0;
+					else
+						ipc.WriteMessage("unloaded", message);
 				}
 
 				else if(type == "setkeyframes"){
