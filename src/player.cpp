@@ -173,19 +173,49 @@ void Player::SetDims(int nw, int nh, int vw, int vh)
 	FlogExpD(h);
 }
 
+int Player::MessageHandlerThread(void* instance)
+{
+	Player* me = (Player*)instance;
+
+	while(me->running){
+		std::string type, message;
+		while(me->ipc->ReadMessage(type, message, 10)){
+			SDL_LockMutex(me->messageQueueMutex);
+	
+			// clear the message queue on a load
+			if(type == "load"){
+				while(!me->messageQueue.empty()){
+					me->messageQueue.pop();
+				}
+			}
+
+			me->messageQueue.push(std::pair<std::string, std::string>(type, message));
+
+			SDL_UnlockMutex(me->messageQueueMutex);
+		}
+	}
+
+	return 0;
+}
+
 void Player::Run(IPC& ipc)
 {
 	char env[] = "SDL_AUDIODRIVER=dsound";
 	putenv(env);
 	SDL_Init(SDL_INIT_TIMER | SDL_INIT_AUDIO);
 
+	running = true;
+
+	this->ipc = &ipc;
+
+	messageQueueMutex = SDL_CreateMutex();
+	messageQueueThread = SDL_CreateThread(MessageHandlerThread, (void*)this);
+
 	initialized = false;
-	std::queue<Message> sendQueue;
 
 	mute = qvMute = false;
 	volume = 1;
 
-	bool running = true;
 	bool quickViewPlayer = false;
 
 	InitAudio();	
@@ -196,17 +226,28 @@ void Player::Run(IPC& ipc)
 	uint32_t keepAliveTimer = SDL_GetTicks();
 
 	while(running){
-		for(unsigned int i = 0; i < sendQueue.size(); i++){
-			if(ipc.WriteMessage(sendQueue.front().first, sendQueue.front().second, 1)){
-				sendQueue.pop();
+		while(true){
+			std::string type, message;
+
+			SDL_LockMutex(messageQueueMutex);
+
+			bool wasMessage = !messageQueue.empty();
+
+			if(wasMessage){
+				type = messageQueue.front().first;
+				message = messageQueue.front().second;
+				messageQueue.pop();
 			}
-		}
 
-		std::string type, message;
+			SDL_UnlockMutex(messageQueueMutex);
 
-		int timeout = video && !video->getPaused() ? 8 : 1000;
-		while(ipc.ReadMessage(type, message, timeout)){
-			if(type == "keepalive") keepAliveTimer = SDL_GetTicks();
+			if(!wasMessage){
+				SDL_Delay(video && !video->getPaused() ? 8 : 50);
+				break;
+			}
+
+			if(type == "keepalive")
+				keepAliveTimer = SDL_GetTicks();
 
 			if(type == "load"){
 				samples.clear();
@@ -330,6 +371,9 @@ void Player::Run(IPC& ipc)
 					s >> t;
 					FlogD("seek " << t);
 					samples.clear();
+
+					t = std::min(std::max(0.0f, t), 1.0f);
+
 					video->seek(t * (float)video->getDurationInFrames(), true);
 				}
 
@@ -407,13 +451,16 @@ void Player::Run(IPC& ipc)
 		}
 
 		// No keepalive message for ~30 seconds, die
-		if(SDL_GetTicks() - keepAliveTimer > 30000){
+		if(SDL_GetTicks() - keepAliveTimer > 60000){
 			FlogD("dying bye bye");
 			running = false;
 		}
 
 		//Sleep(1);
 	}
+
+	SDL_WaitThread(messageQueueThread, NULL);
+	SDL_DestroyMutex(messageQueueMutex);
 
 	FlogD("exiting");
 }

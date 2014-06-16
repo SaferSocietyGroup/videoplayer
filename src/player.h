@@ -24,9 +24,13 @@
 #ifndef PLAYER_H
 #define PLAYER_H
 
+#include <SDL.h>
+
 #include "ipc.h"
 #include "samplequeue.h"
 #include "video.h"
+
+#include <queue>
 
 class Player
 {
@@ -35,12 +39,20 @@ class Player
 	void InitAudio();
 	void CloseAudio();
 	void SetDims(int nw, int nh, int vw, int vh);
+	static int MessageHandlerThread(void* instance);
 
 	bool initialized;
 	int w, h;
+	IPC* ipc;
 		
 	float volume;
 	bool mute, qvMute, audioOutputEnabled;
+	bool running;
+
+	SDL_Thread* messageQueueThread;
+	SDL_mutex* messageQueueMutex;
+	std::queue<std::pair<std::string, std::string>> messageQueue;
+
 	SDL_TimerID noAudioTimer;
 
 	public:

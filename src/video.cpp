@@ -213,7 +213,8 @@ class CVideo : public Video
 		if(!sw) sw = w;
 		if(!sh) sh = h;
 
-		if(!newFrame.avFrame) return;
+		if(!newFrame.avFrame)
+			return;
 
 		// Don't free currentFrame if it is currentFrame itself that's being converted
 		if(currentFrame.avFrame != newFrame.avFrame){
@@ -781,7 +782,8 @@ class CVideo : public Video
 			int ret = av_read_frame(pFormatCtx, &packet);
 
 			// might not be finished even if the file has reached the end, add to a counter
-			if(pFormatCtx->pb->eof_reached) eofCounter++;
+			if(pFormatCtx->pb->eof_reached)
+				eofCounter++;
 
 			// Ret SHOULD return < 0 when eof is reached, but it doesn't always
 			// if it doesn't, check the file pointer if it has eof set for the last 1000 loops
