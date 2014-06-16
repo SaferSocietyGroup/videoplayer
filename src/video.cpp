@@ -590,7 +590,7 @@ class CVideo : public Video
 		int64_t pts = isValidTs(decFrame->pts) ? decFrame->pts : (isValidTs(decFrame->pkt_pts) ? decFrame->pkt_pts : packet.dts);
 		this->lastPts = timeFromPts(pts);
 
-		if(firstPts == 0)
+		if(firstPts == 0 || pts < firstPts)
 			firstPts = pts;
 
 		if(addToQueue && ret == TVideo){
