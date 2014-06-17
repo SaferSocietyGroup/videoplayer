@@ -190,7 +190,8 @@ class CVideo : public Video
 		// If it does the stream probably jumped ahead or back, so current time needs to 
 		// be adjusted accordingly.
 
-		if(frameQueue.empty()) return;
+		if(frameQueue.empty())
+			return;
 
 		double time = timeHandler.getTime();
 		double pts = frameQueue.top().pts;
@@ -586,9 +587,8 @@ class CVideo : public Video
 			}
 		}
 
-		// set presentation timestamp to, in order of priority, frame.pts -> frame.pkt_pts -> frame.pkt_dts	
-		int64_t pts = isValidTs(decFrame->pts) ? decFrame->pts : (isValidTs(decFrame->pkt_pts) ? decFrame->pkt_pts : packet.dts);
-		this->lastPts = timeFromPts(pts);
+		int64_t pts = av_frame_get_best_effort_timestamp(decFrame);
+		this->lastPts = timeFromPts(av_frame_get_best_effort_timestamp(decFrame));
 
 		if(firstPts == 0 || pts < firstPts)
 			firstPts = pts;
