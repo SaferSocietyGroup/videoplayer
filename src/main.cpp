@@ -38,6 +38,8 @@
 
 int main_wrap(int argc, char** argv)
 {
+	SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
+
 	std::cout << "starting video player" << std::endl;
 
 	FlogAssert(argc == 2, "expected 1 parameter with a base-name for a memory mapped file");
