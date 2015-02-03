@@ -984,7 +984,7 @@ class CVideo : public Video
 			avcodec_close(pCodecCtx);
 
 		if(pFormatCtx)
-			av_close_input_file(pFormatCtx);
+			avformat_close_input(&pFormatCtx);
 
 		errorCallback(EUnloadedFile, filename);
 	}
