@@ -1,21 +1,36 @@
-#include <fstream>
+#include <cstdio>
 #include "filestream.h"
+#include "flog.h"
+#include "tools.h"
 
 class CFileStream : public FileStream
 {
 	public:
-	std::fstream stream;
+	FILE* f = 0;
 	std::string filename;
-	AVIOContext* ctx;
+	AVIOContext* ctx = 0;
 	unsigned char* buffer = 0;
 	
 	void Open(const std::string& filename, bool rw)
 	{
-		stream.open(filename, std::ios_base::binary | std::ios_base::in | (rw ? std::ios_base::out : std::ios_base::in));
+		std::string mode = rw ? "rb" : "rwb";
+		f = fopen(filename.c_str(), mode.c_str());
+
+		if(!f)
+			throw StreamEx(Str("could not open file: " << filename));
+
 		this->filename = filename;
-		int size = FF_INPUT_BUFFER_PADDING_SIZE + 1024 * 1024;
+		int size = FF_INPUT_BUFFER_PADDING_SIZE + 1024 * 32;
+
 		buffer = (unsigned char*)av_mallocz(size);
+
+		if(buffer == NULL)
+			throw StreamEx("failed to allocate RAM");
+
 		ctx = GenAVIOContext(buffer, size, rw);
+
+		if(ctx == NULL)
+			throw StreamEx("failed to allocate RAM");
 	}
 	
 	std::string GetPath()
@@ -25,36 +40,47 @@ class CFileStream : public FileStream
 	
 	int Read(uint8_t *buf, int buf_size)
 	{
-		stream.read((char*)buf, buf_size);
-		return stream.gcount();
+		return fread((void*)buf, 1, buf_size, f);
 	}
 
 	int Write(uint8_t *buf, int buf_size)
 	{
-		stream.write((char*)buf, buf_size);
-		return stream.good() ? buf_size : 0;
+		return fwrite(buf, 1, buf_size, f);
 	}
 
 	int64_t Seek(int64_t offset, int whence)
 	{
-		stream.seekg(offset, (std::ios_base::seekdir)whence);
-		return stream.tellg();
+		return fseek(f, offset, whence);
 	}
 
 	AVIOContext* GetAVIOContext()
 	{
 		return ctx;
 	}
+	
+	void Close()
+	{
+		if(ctx){
+			avio_flush(ctx);
+
+			// TODO leaking memory, but if it's enabled ffmpeg crashes.
+			// av_freep(&buffer);
+
+			av_free(ctx);
+
+			ctx = NULL;
+			buffer = NULL;
+		}
+		
+		if(f){
+			fclose(f);
+			f = NULL;
+		}
+	}
 
 	~CFileStream()
 	{
-		if(stream.is_open())
-			stream.close();
-
-		if(buffer)
-			av_free(buffer);
-
-		// todo free context
+		Close();
 	}
 };
 

@@ -30,6 +30,7 @@
 #include "audiohandler.h"
 #include "flog.h"
 #include "tools.h"
+#include "filestream.h"
 
 typedef std::pair<std::string, std::string> Message;
 
@@ -252,7 +253,10 @@ void Player::Run(IPC& ipc)
 			if(type == "load"){
 				samples.clear();
 
-				video = Video::Create(message, 
+				FileStreamPtr s = FileStream::Create();
+				s->Open(message, false);
+
+				video = Video::Create(s, 
 					// error handler
 					[&](Video::Error error, const std::string& msg){
 						if(error < Video::EEof)

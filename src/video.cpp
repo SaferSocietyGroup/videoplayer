@@ -102,10 +102,10 @@ class CVideo : public Video
 
 	Frame currentFrame;
 	std::vector<KfPos> keyframes;
-	std::string filename;
 	float t;
 	bool drawTimeStamp;
 	bool reportedEof;
+	StreamPtr stream;
 	
 	CVideo(ErrorCallback errorCallback, int frameQueueSize){
 		this->errorCallback = errorCallback;
@@ -141,6 +141,8 @@ class CVideo : public Video
 		av_free(decFrame);
 		////freeFrame(decFrame);
 		freeFrame(&currentFrame.avFrame);
+
+		LogDebug("end of destructor");
 	}
 
 	Frame fetchFrame(){
@@ -900,13 +902,16 @@ class CVideo : public Video
 		return -1;
 	}
 
-	bool openFile(AudioCallback audioCallback, int freq, int channels){
-		LogInfo("Trying to load file: " << filename);
+	bool openFile(StreamPtr stream, AudioCallback audioCallback, int freq, int channels){
+		LogInfo("Trying to load file: " << stream->GetPath());
 
 		int ret;
+		this->stream = stream;
 
-		pFormatCtx = NULL;
-		if((ret = avformat_open_input(&pFormatCtx, filename.c_str(), NULL, NULL)) != 0){
+		pFormatCtx = avformat_alloc_context();
+		pFormatCtx->pb = stream->GetAVIOContext();
+
+		if((ret = avformat_open_input(&pFormatCtx, stream->GetPath().c_str(), NULL, NULL)) != 0){
 			char ebuf[512];
 			av_strerror(ret, ebuf, sizeof(ebuf));
 			LogError("couldn't open file");
@@ -923,7 +928,7 @@ class CVideo : public Video
 		}
 
 		/* Print video format information */
-		av_dump_format(pFormatCtx, 0, filename.c_str(), 0);
+		av_dump_format(pFormatCtx, 0, stream->GetPath().c_str(), 0);
 
 		// If the loader logged something about wmv being DRM protected, give up
 		if(drm){
@@ -983,10 +988,14 @@ class CVideo : public Video
 		if(pCodecCtx)
 			avcodec_close(pCodecCtx);
 
-		if(pFormatCtx)
+		if(pFormatCtx){
+			pFormatCtx->pb = 0;
 			avformat_close_input(&pFormatCtx);
+		}
 
-		errorCallback(EUnloadedFile, filename);
+		stream->Close();
+
+		errorCallback(EUnloadedFile, stream->GetPath());
 	}
 
 	bool IsEof(){
@@ -1071,7 +1080,7 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 	}
 }
 
-VideoPtr Video::Create(const std::string& filename, ErrorCallback errorCallback, AudioCallback audioCallback,
+VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, AudioCallback audioCallback,
 	int freq, int channels, int frameQueueSize, const std::string& kf)
 {
 	static bool initialized = false;
@@ -1079,14 +1088,13 @@ VideoPtr Video::Create(const std::string& filename, ErrorCallback errorCallback,
 		av_register_all();
 
 	CVideo* video = new CVideo(errorCallback, frameQueueSize);
-	video->filename = filename;
 
 	video->setIFrames(kf);
 
 	av_log_set_callback(logCb);
 	av_log_set_level(AV_LOG_WARNING);
 
-	if(!video->openFile(audioCallback, channels, freq)){
+	if(!video->openFile(stream, audioCallback, channels, freq)){
 		errorCallback(EFile, "could not open file");
 		delete video;
 		return 0;

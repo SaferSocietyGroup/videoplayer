@@ -9,6 +9,7 @@ typedef std::shared_ptr<class FileStream> FileStreamPtr;
 
 class FileStream : public Stream
 {
+	public:
 	virtual void Open(const std::string& filename, bool rw = false) = 0;
 	static FileStreamPtr Create();
 };
