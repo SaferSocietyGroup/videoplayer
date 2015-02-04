@@ -71,6 +71,15 @@ class Tools
 
 		return ret;
 	}
+
+	static inline std::wstring StrToWstr(const std::string& w)
+	{
+		std::wstring ret;
+		for(char wc : w)
+			ret.push_back((wchar_t)wc);
+
+		return ret;
+	}
 };
 
 #endif

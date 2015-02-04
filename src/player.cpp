@@ -250,11 +250,20 @@ void Player::Run(IPC& ipc)
 			if(type == "keepalive")
 				keepAliveTimer = SDL_GetTicks();
 
-			if(type == "load"){
+			if(type == "load" || type == "lfsc_load"){
 				samples.clear();
 
-				FileStreamPtr s = FileStream::Create();
-				s->Open(message, false);
+				StreamPtr s;
+
+				if(type == "load"){
+					FileStreamPtr fs = FileStream::Create();
+					fs->Open(message, false);
+					s = fs;
+				}
+
+				else {
+					s = lfsc->Open(Tools::StrToWstr(message));
+				}
 
 				video = Video::Create(s, 
 					// error handler
@@ -283,6 +292,11 @@ void Player::Run(IPC& ipc)
 			
 			else if(type == "setquickviewplayer"){
 				quickViewPlayer = (message == "true");
+			}
+			
+			else if(type == "lfsc_connect"){
+				lfsc = Lfscpp::Create();
+				lfsc->Connect(Tools::StrToWstr(message), 3000);
 			}
 
 			else if(type == "quit"){

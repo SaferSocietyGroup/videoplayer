@@ -29,6 +29,7 @@
 #include "ipc.h"
 #include "samplequeue.h"
 #include "video.h"
+#include "lfscpp.h"
 
 #include <queue>
 
@@ -52,6 +53,7 @@ class Player
 	SDL_Thread* messageQueueThread;
 	SDL_mutex* messageQueueMutex;
 	std::queue<std::pair<std::string, std::string>> messageQueue;
+	LfscppPtr lfsc = 0;
 
 	SDL_TimerID noAudioTimer;
 
