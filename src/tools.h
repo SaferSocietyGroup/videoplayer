@@ -61,6 +61,16 @@ class Tools
 	{
 		return (1 / (2 * (float)M_PI * POW2(sigma))) * pow((float)M_E, (float)(-((POW2(x) / (2 * POW2(sigma))))));
 	}
+
+	// this only reads the first 8 bits in every word and hopes that it maps to ASCII or latin-1
+	static inline std::string WstrToStr(const std::wstring& w)
+	{
+		std::string ret;
+		for(wchar_t wc : w)
+			ret.push_back((char)wc);
+
+		return ret;
+	}
 };
 
 #endif

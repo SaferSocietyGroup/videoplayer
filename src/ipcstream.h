@@ -21,20 +21,20 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef FILESTREAM_H
-#define FILESTREAM_H
+#ifndef IPCSTREAM_H
+#define IPCSTREAM_H
 
 #include <memory>
 
 #include "stream.h"
 
-typedef std::shared_ptr<class FileStream> FileStreamPtr;
+typedef std::shared_ptr<class IpcStream> IpcStreamPtr;
 
-class FileStream : public Stream
+class IpcStream : public Stream
 {
 	public:
-	virtual void Open(const std::string& filename, bool rw = false) = 0;
-	static FileStreamPtr Create();
+	virtual void Open(const std::wstring& filename, struct lfsc_file* file) = 0;
+	static IpcStreamPtr Create();
 };
 
 #endif

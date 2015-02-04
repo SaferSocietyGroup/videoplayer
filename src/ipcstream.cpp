@@ -21,93 +21,81 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <cstdio>
-#include "filestream.h"
-#include "flog.h"
+#include <lfsc.h>
+
+#include "ipcstream.h"
 #include "tools.h"
 
-class CFileStream : public FileStream
+class CIpcStream : public IpcStream
 {
 	public:
-	FILE* f = 0;
-	std::string filename;
+	lfsc_file* f = 0;
 	AVIOContext* ctx = 0;
-	unsigned char* buffer = 0;
+	std::wstring filename;
+	unsigned char* buffer;
 	
-	void Open(const std::string& filename, bool rw)
+	~CIpcStream()
 	{
-		std::string mode = rw ? "rb" : "rwb";
-		f = fopen(filename.c_str(), mode.c_str());
+		Close();
+	}
 
-		if(!f)
-			throw StreamEx(Str("could not open file: " << filename));
-
+	void Open(const std::wstring& filename, struct lfsc_file* file)
+	{
+		this->f = file;
 		this->filename = filename;
+
+		int flags = 0;
+		lfsc_status s = lfsc_get_flags(f, &flags);
+
+		if(s != LFSC_SOK)
+			throw StreamEx("could not get file flags");
+		
 		int size = FF_INPUT_BUFFER_PADDING_SIZE + 1024 * 32;
-
 		buffer = (unsigned char*)av_mallocz(size);
-
 		if(buffer == NULL)
 			throw StreamEx("failed to allocate RAM");
 
-		ctx = GenAVIOContext(buffer, size, rw);
+		ctx = GenAVIOContext(buffer, size, (flags & LFSC_SERR_WRITE_PIPE) ? true : false);
 
 		if(ctx == NULL)
 			throw StreamEx("failed to allocate RAM");
 	}
 	
-	std::string GetPath()
-	{
-		return filename;
-	}
-	
 	int Read(uint8_t *buf, int buf_size)
 	{
-		return fread((void*)buf, 1, buf_size, f);
+		return lfsc_fread(buf, 1, buf_size, f);
 	}
 
 	int Write(uint8_t *buf, int buf_size)
 	{
-		return fwrite(buf, 1, buf_size, f);
+		return lfsc_fwrite(buf, 1, buf_size, f);
 	}
 
 	int64_t Seek(int64_t offset, int whence)
 	{
-		return fseek(f, offset, whence);
+		return lfsc_fseek(f, offset, whence);
+	}
+
+	std::string GetPath()
+	{
+		return Tools::WstrToStr(filename);
 	}
 
 	AVIOContext* GetAVIOContext()
 	{
 		return ctx;
 	}
-	
+
 	void Close()
 	{
-		if(ctx){
-			avio_flush(ctx);
-
-			// TODO leaking memory, but if it's enabled ffmpeg crashes.
-			// av_freep(&buffer);
-
-			av_free(ctx);
-
-			ctx = NULL;
-			buffer = NULL;
-		}
-		
-		if(f){
-			fclose(f);
-			f = NULL;
-		}
-	}
-
-	~CFileStream()
-	{
-		Close();
+		if(f)
+			lfsc_fclose(f);
+			
+		f = 0;
 	}
 };
 
-FileStreamPtr FileStream::Create()
+IpcStreamPtr IpcStream::Create()
 {
-	return std::make_shared<CFileStream>();
+	return std::make_shared<CIpcStream>();
 }
