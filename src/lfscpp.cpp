@@ -1,4 +1,5 @@
 #include <lfsc.h>
+#include <cstdio>
 
 #include "lfscpp.h"
 #include "tools.h"
@@ -20,7 +21,10 @@ class CLfscpp : public Lfscpp
 
 	void Connect(const std::wstring name, int msTimeout)
 	{
-		lfsc_ctx_connect(ctx, name.c_str(), msTimeout);
+		lfsc_status s = lfsc_ctx_connect(ctx, name.c_str(), msTimeout);
+
+		if(s != LFSC_SOK)
+			throw StreamEx(Str("could not connect to pipe: " << Tools::WstrToStr(name) << ", status: " << (int)s));
 	}
 
 	void Disconnect()
@@ -33,8 +37,9 @@ class CLfscpp : public Lfscpp
 		lfsc_file* f;
 		lfsc_status s = lfsc_ctx_fopen(ctx, &f, name.c_str());
 
-		if(s != LFSC_SOK)
-			throw StreamEx(/*Str("could not open file: " << Tools::WstrToStr(name) << ", status: " << (int)s)*/ "could not open file");
+		if(s != LFSC_SOK){
+			throw StreamEx(Str("could not open file: " << Tools::WstrToStr(name) << ", status: " << (int)s));
+		}
 
 		IpcStreamPtr stream = IpcStream::Create();
 		stream->Open(name, f);

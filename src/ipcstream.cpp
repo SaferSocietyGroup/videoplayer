@@ -25,6 +25,7 @@
 
 #include "ipcstream.h"
 #include "tools.h"
+#include "flog.h"
 
 class CIpcStream : public IpcStream
 {
@@ -55,7 +56,7 @@ class CIpcStream : public IpcStream
 		if(buffer == NULL)
 			throw StreamEx("failed to allocate RAM");
 
-		ctx = GenAVIOContext(buffer, size, (flags & LFSC_SERR_WRITE_PIPE) ? true : false);
+		ctx = GenAVIOContext(buffer, size, /*(flags & LFSC_SERR_WRITE_PIPE) ? true : false*/ false);
 
 		if(ctx == NULL)
 			throw StreamEx("failed to allocate RAM");
@@ -63,17 +64,20 @@ class CIpcStream : public IpcStream
 	
 	int Read(uint8_t *buf, int buf_size)
 	{
-		return lfsc_fread(buf, 1, buf_size, f);
+		return lfsc_read(buf, buf_size, f);
 	}
 
 	int Write(uint8_t *buf, int buf_size)
 	{
-		return lfsc_fwrite(buf, 1, buf_size, f);
+		return lfsc_write(buf, buf_size, f);
 	}
 
 	int64_t Seek(int64_t offset, int whence)
 	{
-		return lfsc_fseek(f, offset, whence);
+		if(whence == AVSEEK_SIZE)
+			return lfsc_get_length(f); 
+
+		return lfsc_fseek(f, offset, whence & 3);
 	}
 
 	std::string GetPath()

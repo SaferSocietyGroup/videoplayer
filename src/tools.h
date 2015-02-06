@@ -48,37 +48,28 @@ typedef unsigned char byte;
 #define POW2(__x) ((__x) * (__x))
 
 #include <cmath>
-
 #include <algorithm>
+#include <sstream>
+#include <memory>
+#include <cstdlib>
 
 #define CLAMP(__MIN, __MAX, __VAL) std::min(std::max((__MIN), (__VAL)),( __MAX))
 
 class Tools
 {
 	public:
-	/* the gaussian transorm of x */
-	static inline float calcGaussian(float x, float sigma)
-	{
-		return (1 / (2 * (float)M_PI * POW2(sigma))) * pow((float)M_E, (float)(-((POW2(x) / (2 * POW2(sigma))))));
-	}
-
-	// this only reads the first 8 bits in every word and hopes that it maps to ASCII or latin-1
 	static inline std::string WstrToStr(const std::wstring& w)
 	{
-		std::string ret;
-		for(wchar_t wc : w)
-			ret.push_back((char)wc);
-
-		return ret;
+		std::unique_ptr<char> tmp = std::unique_ptr<char>(new char [w.size() * 4 + 1]());
+		size_t size = wcstombs(tmp.get(), w.c_str(), w.size() * 4 + 1);
+		return std::string(tmp.get(), size);
 	}
 
 	static inline std::wstring StrToWstr(const std::string& w)
 	{
-		std::wstring ret;
-		for(char wc : w)
-			ret.push_back((wchar_t)wc);
-
-		return ret;
+		std::unique_ptr<wchar_t> tmp = std::unique_ptr<wchar_t>(new wchar_t [w.size() + 2]());
+		size_t size = mbstowcs(tmp.get(), w.c_str(), w.size() + 1);
+		return std::wstring(tmp.get(), size);
 	}
 };
 

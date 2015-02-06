@@ -988,6 +988,9 @@ class CVideo : public Video
 		if(pCodecCtx)
 			avcodec_close(pCodecCtx);
 
+		// force audio handler to close its codec
+		audioHandler = 0;
+
 		if(pFormatCtx){
 			pFormatCtx->pb = 0;
 			avformat_close_input(&pFormatCtx);
