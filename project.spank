@@ -7,7 +7,7 @@ cflags           ggdb
 sourcedir        src
 cflags           std=c++0x Wall Wno-deprecated-declarations
 
-lib-static       libavdevice libavformat libavcodec libavfilter libswscale libavutil sdl
+lib-static       libavdevice libavformat libavcodec libavfilter libswscale libswresample libavutil  sdl
 
 #ldflags         mconsole 
 
@@ -16,6 +16,8 @@ ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'"
 
 # generate version information for executable
 prebuildscript   "$(host_dash)windres -O coff -o '$(tmpdir)/versioninfo.res' res/versioninfo.rc"
+
+depends          local-file-stream-client-native
 
 [*debug: common]
 cflags           O0

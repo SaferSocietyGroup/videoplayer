@@ -21,49 +21,20 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef PLAYER_H
-#define PLAYER_H
+#ifndef IPCSTREAM_H
+#define IPCSTREAM_H
 
-#include <SDL.h>
+#include <memory>
 
-#include "ipc.h"
-#include "samplequeue.h"
-#include "video.h"
-#include "lfscpp.h"
+#include "stream.h"
 
-#include <queue>
+typedef std::shared_ptr<class IpcStream> IpcStreamPtr;
 
-class Player
+class IpcStream : public Stream
 {
-	SampleQueue samples;
-
-	void InitAudio();
-	void CloseAudio();
-	void SetDims(int nw, int nh, int vw, int vh);
-	static int MessageHandlerThread(void* instance);
-
-	bool initialized;
-	int w, h;
-	IPC* ipc;
-		
-	float volume;
-	bool mute, qvMute, audioOutputEnabled;
-	bool running;
-
-	SDL_Thread* messageQueueThread;
-	SDL_mutex* messageQueueMutex;
-	std::queue<std::pair<std::string, std::string>> messageQueue;
-	LfscppPtr lfsc = 0;
-
-	SDL_TimerID noAudioTimer;
-
 	public:
-	VideoPtr video;
-	int freq;
-
-	void PauseAudio(bool val);
-	void Run(IPC& ipc);
-	static void AudioCallback(void *me, Uint8 *stream, int len);
+	virtual void Open(const std::wstring& filename, struct lfsc_file* file) = 0;
+	static IpcStreamPtr Create();
 };
 
 #endif

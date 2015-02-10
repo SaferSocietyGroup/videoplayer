@@ -30,6 +30,7 @@
 #include "audiohandler.h"
 #include "flog.h"
 #include "tools.h"
+#include "filestream.h"
 
 typedef std::pair<std::string, std::string> Message;
 
@@ -249,24 +250,49 @@ void Player::Run(IPC& ipc)
 			if(type == "keepalive")
 				keepAliveTimer = SDL_GetTicks();
 
-			if(type == "load"){
+			if(type == "load" || type == "lfsc_load"){
 				samples.clear();
 
-				video = Video::Create(message, 
-					// error handler
-					[&](Video::Error error, const std::string& msg){
-						if(error < Video::EEof)
-							ipc.WriteMessage("error", msg);
-						else
-							ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
-					},
-					// audio handler
-					[&](const Sample* buffer, int size){
-						SDL_LockAudio();
-						for(int i = 0; i < size; i++)
-							samples.push(buffer[i]);
-						SDL_UnlockAudio();
-					}, 48000, 2, quickViewPlayer ? 5 : 60);
+				StreamPtr s;
+
+				FlogD("trying to load: " << message << " (" << type << ")");
+
+				try {
+					video = 0;
+
+					if(type == "load"){
+						FileStreamPtr fs = FileStream::Create();
+						fs->Open(message, false);
+						s = fs;
+					}
+
+					else {
+						s = lfsc->Open(Tools::StrToWstr(message));
+						s->Seek(0, SEEK_SET);
+					}
+
+					video = Video::Create(s, 
+						// error handler
+						[&](Video::Error error, const std::string& msg){
+							if(error < Video::EEof)
+								ipc.WriteMessage("error", msg);
+							else
+								ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
+						},
+						// audio handler
+						[&](const Sample* buffer, int size){
+							SDL_LockAudio();
+							for(int i = 0; i < size; i++)
+								samples.push(buffer[i]);
+							SDL_UnlockAudio();
+						}, 48000, 2, quickViewPlayer ? 5 : 60);
+				}
+
+				catch (StreamEx ex)
+				{
+					FlogE("failed to load file: " << ex.what());
+					ipc.WriteMessage("error", ex.what());
+				}
 
 				if(video){
 					if(w && h)
@@ -274,11 +300,26 @@ void Player::Run(IPC& ipc)
 					else
 						SetDims(video->getWidth(), video->getHeight(), video->getWidth(), video->getHeight());
 					FlogD("loaded");
+				}else{
+					FlogD("not loaded");
 				}
 			}
 			
 			else if(type == "setquickviewplayer"){
 				quickViewPlayer = (message == "true");
+			}
+			
+			else if(type == "lfsc_connect"){
+				lfsc = Lfscpp::Create();
+				try {
+					lfsc->Connect(Tools::StrToWstr(message), 3000);
+				}
+
+				catch (StreamEx ex)
+				{
+					FlogE("failed to load file: " << ex.what());
+					ipc.WriteMessage("error", ex.what());
+				}
 			}
 
 			else if(type == "quit"){

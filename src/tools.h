@@ -48,18 +48,28 @@ typedef unsigned char byte;
 #define POW2(__x) ((__x) * (__x))
 
 #include <cmath>
-
 #include <algorithm>
+#include <sstream>
+#include <memory>
+#include <cstdlib>
 
 #define CLAMP(__MIN, __MAX, __VAL) std::min(std::max((__MIN), (__VAL)),( __MAX))
 
 class Tools
 {
 	public:
-	/* the gaussian transorm of x */
-	static inline float calcGaussian(float x, float sigma)
+	static inline std::string WstrToStr(const std::wstring& w)
 	{
-		return (1 / (2 * (float)M_PI * POW2(sigma))) * pow((float)M_E, (float)(-((POW2(x) / (2 * POW2(sigma))))));
+		std::unique_ptr<char> tmp = std::unique_ptr<char>(new char [w.size() * 4 + 1]());
+		size_t size = wcstombs(tmp.get(), w.c_str(), w.size() * 4 + 1);
+		return std::string(tmp.get(), size);
+	}
+
+	static inline std::wstring StrToWstr(const std::string& w)
+	{
+		std::unique_ptr<wchar_t> tmp = std::unique_ptr<wchar_t>(new wchar_t [w.size() + 2]());
+		size_t size = mbstowcs(tmp.get(), w.c_str(), w.size() + 1);
+		return std::wstring(tmp.get(), size);
 	}
 };
 
