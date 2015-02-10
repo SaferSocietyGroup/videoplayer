@@ -33,6 +33,7 @@
 #include "timehandler.h"
 
 #include "avlibs.h"
+#include "stream.h"
 
 class Frame
 {
@@ -105,7 +106,7 @@ class Video
 	virtual void addTime(double t) = 0;
 	virtual double getTime() = 0;
 	
-	static VideoPtr Create(const std::string& filename, ErrorCallback errorHandler, AudioCallback audioCallback,
+	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, AudioCallback audioCallback,
 		int freq, int channels, int frameQueueSize, const std::string& kf = "");
 };
 
