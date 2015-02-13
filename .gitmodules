@@ -1,3 +1,4 @@
 [submodule "local-file-stream-client-native"]
 	path = local-file-stream-client-native
-	url = git@github.com:NetClean/local-file-stream-client-native.git
+	url = https://github.com/NetClean/local-file-stream-client-native.git
+	pushurl = git@github.com:NetClean/local-file-stream-client-native.git
