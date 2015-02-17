@@ -1,0 +1,19 @@
+name              dummyhost
+template          c++11
+target_platform   mingw32
+cflags            I../src std=c++11 Wall
+sourcedir         ../src src
+#exclude           ../src/main.cpp
+exclude           ../src/Program.cpp
+exclude           ../src/Lfscpp.cpp
+exclude           ../src/IpcStream.cpp
+exclude           ../src/Video.cpp
+exclude           ../src/SdlAudioDevice.cpp
+exclude           ../src/TimeHandler.cpp
+exclude           ../src/AudioHandler.cpp
+exclude           ../src/FileStream.cpp
+exclude           ../src/Stream.cpp
+
+lib-static        sdl
+ldflags           mconsole 
+ldflags           static-libgcc "Wl,-Bstatic"

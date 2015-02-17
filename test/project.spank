@@ -1,0 +1,23 @@
+[-common]
+target_platform	 mingw32
+name             UnitTest
+
+template         c++11
+cflags           ggdb
+sourcedir        ../src src
+exclude          ../src/main.cpp
+cflags           std=c++0x Wall Wno-deprecated-declarations I../src
+
+lib-static       sdl
+
+ldflags          mconsole 
+
+# link statically
+ldflags          static-libgcc Wl,-Bstatic
+
+[*debug: common]
+cflags           O0
+
+[release: common]
+cflags           O3
+postbuildscript  "$(host_dash)strip $(target)"
