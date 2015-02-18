@@ -33,11 +33,16 @@ class CFileStream : public FileStream
 	std::string filename;
 	AVIOContext* ctx = 0;
 	unsigned char* buffer = 0;
+	long fileSize;
 	
 	void Open(const std::string& filename, bool rw)
 	{
 		std::string mode = rw ? "rb" : "rwb";
 		f = fopen(filename.c_str(), mode.c_str());
+
+		fseek(f, 0, SEEK_END);
+		fileSize = ftell(f);
+		fseek(f, 0, SEEK_SET);
 
 		if(!f)
 			throw StreamEx(Str("could not open file: " << filename));
@@ -73,7 +78,10 @@ class CFileStream : public FileStream
 
 	int64_t Seek(int64_t offset, int whence)
 	{
-		return fseek(f, offset, whence);
+		if(whence == AVSEEK_SIZE)
+			return fileSize;
+
+		return fseek(f, offset, whence & 3);
 	}
 
 	AVIOContext* GetAVIOContext()

@@ -574,6 +574,11 @@ class CVideo : public Video
 		FlogExpD(firstPts);
 		FlogExpD(t);
 		FlogExpD(tsFromTime(t));
+
+		// work around for h.264/mp4 files not seeking to 0
+		if(t <= 0.0)
+			t = -1;
+
 		int seekRet = av_seek_frame(pFormatCtx, videoStream, tsFromTime(t) + firstPts, AVSEEK_FLAG_ANY);
 
 		if(seekRet > 0){
