@@ -17,7 +17,7 @@ ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'"
 # generate version information for executable
 prebuildscript   "$(host_dash)windres -O coff -o '$(tmpdir)/versioninfo.res' res/versioninfo.rc"
 
-depends          local-file-stream-client-native
+depends          local-file-stream-client-native:32bit-static
 
 [*debug: common]
 cflags           O0
