@@ -1,5 +1,0 @@
-name mmaptest
-target_platform mingw32
-cflags std=gnu99 Wall I../../src gstabs+
-sources *.c *.cpp
-sourcedir . ../../src/mmap.c ../../src/flogstub.cpp
