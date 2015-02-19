@@ -33,6 +33,7 @@ class CFileStream : public FileStream
 	std::string filename;
 	AVIOContext* ctx = 0;
 	unsigned char* buffer = 0;
+	long fileSize = 0;
 	
 	void Open(const std::string& filename, bool rw)
 	{
@@ -41,6 +42,10 @@ class CFileStream : public FileStream
 
 		if(!f)
 			throw StreamEx(Str("could not open file: " << filename));
+
+		fseek(f, 0, SEEK_END);
+		fileSize = ftell(f);
+		fseek(f, 0, SEEK_SET);
 
 		this->filename = filename;
 		int size = FF_INPUT_BUFFER_PADDING_SIZE + 1024 * 32;
@@ -73,7 +78,10 @@ class CFileStream : public FileStream
 
 	int64_t Seek(int64_t offset, int whence)
 	{
-		return fseek(f, offset, whence);
+		if(whence == AVSEEK_SIZE)
+			return fileSize;
+
+		return fseek(f, offset, whence & 3);
 	}
 
 	AVIOContext* GetAVIOContext()
