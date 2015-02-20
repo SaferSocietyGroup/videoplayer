@@ -48,7 +48,7 @@ class CAudioHandler : public AudioHandler
 	uint8_t** dstBuf;
 	int dstLineSize;
 	
-	double timeFromPts(uint64_t pts, AVRational timeBase){
+	double timeFromPts(int64_t pts, AVRational timeBase){
 		return (double)pts * av_q2d(timeBase);
 	}
 
@@ -117,7 +117,8 @@ class CAudioHandler : public AudioHandler
 				FlogAssert(ret >= 0, "error allocating samples: " << ret);
 			}
 				
-			double ts = timeFromPts(frame->pkt_dts != AV_NOPTS_VALUE ? frame->pkt_pts : frame->pkt_dts, stream->time_base);
+			int64_t pts = av_frame_get_best_effort_timestamp(frame);
+			double ts = timeFromPts(pts, stream->time_base);
 
 			int dstSampleCount = av_rescale_rnd(frame->nb_samples, freq, aCodecCtx->sample_rate, AV_ROUND_UP);
 

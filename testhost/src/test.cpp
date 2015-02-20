@@ -2,6 +2,7 @@
 #include <ipc.h>
 #include <flog.h>
 #include <sstream>
+#include <memory>
 
 #include "tools.h"
 #include "commandline.h"
@@ -30,6 +31,7 @@ int main(int argc, char** argv)
 	CommandLine::Start();
 
 	SDL_Surface* surface = 0;
+	std::shared_ptr<char> surfacePixels;
 
 	while(!done){
 		SDL_Event event;
@@ -77,10 +79,14 @@ int main(int argc, char** argv)
 				uint16_t height = *(((uint16_t*)buffer.data) + 1);
 
 				if(!surface || surface->w != (int)width || surface->h != (int)height){
-					if(surface) SDL_FreeSurface(surface);
+					if(surface)
+						SDL_FreeSurface(surface);
 				
 					FlogV("new width, height: " << width << ", " << height);
-					surface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 24, 0xff0000, 0xff00, 0xff, 0x0);
+
+					surfacePixels = std::shared_ptr<char>(new char [width * height * 3]);
+					//surface = SDL_CreateRGBSurface(SDL_SWSURFACE, width, height, 24, 0xff0000, 0xff00, 0xff, 0x0);
+					surface = SDL_CreateRGBSurfaceFrom(surfacePixels.get(), width, height, 24, width * 3, 0xff0000, 0xff00, 0xff, 0x0);
 				}
 
 				memcpy(surface->pixels, buffer.data + 4, width * height * 3);

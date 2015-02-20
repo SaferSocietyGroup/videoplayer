@@ -52,6 +52,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			samples->pop();
 
 			double adjust = s.ts - (videoTime + extraTime);
+
 			if(adjust > 0)
 				extraTime += adjust;
 		
@@ -66,12 +67,6 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			stream[i+3] = (s.chn[1] >> 8) & 0xff;
 		}else{
 			stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
-		}
-
-		if(extraTime >= 1.0 / 120.0 && me->video != 0){
-			me->video->addTime(extraTime);
-			extraTime = 0;
-			videoTime = me->video->getTime();
 		}
 	}
 
@@ -476,7 +471,6 @@ void Player::Run(IPC& ipc)
 				ipc.ReturnWriteBuffer("frame", &buffer, w * h * 3 + 4);
 
 				ipc.WriteMessage("position", Str((float)video->getPosition() / (float)video->getDurationInFrames()));
-
 			}else{
 				//FlogD("no frame");
 			}
