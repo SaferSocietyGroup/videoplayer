@@ -78,10 +78,16 @@ class CFileStream : public FileStream
 
 	int64_t Seek(int64_t offset, int whence)
 	{
+		FlogExpD(whence);
+		FlogExpD(whence & 3);
+
 		if(whence == AVSEEK_SIZE)
 			return fileSize;
 
-		return fseek(f, offset, whence & 3);
+		if(fseek(f, offset, whence & 3) == 0)
+			return ftell(f);
+
+		return 0;
 	}
 
 	AVIOContext* GetAVIOContext()
