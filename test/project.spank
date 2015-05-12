@@ -8,9 +8,11 @@ sourcedir        ../src src
 exclude          ../src/main.cpp
 cflags           std=c++0x Wall Wno-deprecated-declarations I../src
 
-lib-static       sdl
+lib-static       libavdevice libavformat libavcodec libavfilter libswscale libswresample libavutil  sdl
 
 ldflags          mconsole 
+
+depends          ../local-file-stream-client-native:32bit-static
 
 # link statically
 ldflags          static-libgcc Wl,-Bstatic
