@@ -410,7 +410,7 @@ void Player::Run(IPC& ipc)
 
 					t = std::min(std::max(0.0f, t), 1.0f);
 
-					video->seek(t * (float)video->getDurationInFrames(), true);
+					video->seek(t * (float)video->getDurationInFrames(), false);
 				}
 
 				else if(type == "setdims"){
