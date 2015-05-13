@@ -42,6 +42,7 @@ class CAudioHandler : public AudioHandler
 	IAudioDevice* audioDevice;
 	int channels;
 	int freq;
+	float lastTimeWarp = 0;
 
 	AVCodecContext *aCodecCtx;
 	AVCodec *aCodec;
@@ -99,14 +100,19 @@ class CAudioHandler : public AudioHandler
 		int bytesDecoded = avcodec_decode_audio4(aCodecCtx, frame, &got_frame, &packet);
 
 		if(bytesDecoded >= 0 && got_frame){
-			if(!this->swr){
+			if(!this->swr || (lastTimeWarp != timeWarp)){
+				lastTimeWarp = timeWarp;
+
+				if(this->swr)
+					swr_free(&this->swr);
+
 				int64_t chLayout = frame->channel_layout != 0 ? frame->channel_layout : 
 					av_get_default_channel_layout(frame->channels);
 
 				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(this->channels), 
-					AV_SAMPLE_FMT_S16, this->freq, chLayout, (AVSampleFormat)frame->format, 
-					frame->sample_rate, 0, NULL);
-
+					AV_SAMPLE_FMT_S16, this->freq / timeWarp, chLayout, (AVSampleFormat)frame->format, 
+					(float)frame->sample_rate, 0, NULL);
+				
 				FlogAssert(this->swr, "error allocating swr");
 				
 				swr_init(this->swr);
@@ -120,7 +126,7 @@ class CAudioHandler : public AudioHandler
 			int64_t pts = av_frame_get_best_effort_timestamp(frame);
 			double ts = timeFromPts(pts, stream->time_base);
 
-			int dstSampleCount = av_rescale_rnd(frame->nb_samples, freq, aCodecCtx->sample_rate, AV_ROUND_UP);
+			int dstSampleCount = av_rescale_rnd(frame->nb_samples, freq / timeWarp, aCodecCtx->sample_rate, AV_ROUND_UP);
 
 			int ret = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)frame->data, frame->nb_samples);
 
