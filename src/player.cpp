@@ -38,42 +38,50 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 {
 	Player* me = (Player*)vMe;
 	SampleQueue* samples = &me->samples;
-
-	bool paused = me->video != 0 ? me->video->getPaused() : true;
-
-	double videoTime = me->video != 0 ? me->video->getTime() : 0;
-	double extraTime = 0;
 	
-	for(int i = 0; i < len; i += 4){
-		extraTime += 1.0 / (double)me->freq;
+	double t = 0.0f;
+	bool noSamples = samples->empty();
 
-		if(!samples->empty() && !paused){
+	for(int i = 0; i < len; i += 4){
+		if(!samples->empty()){
 			Sample s = samples->front();
 			samples->pop();
 
-			double adjust = s.ts - (videoTime + extraTime);
-
-			if(adjust > 0)
-				extraTime += adjust;
-		
 			for(int j = 0; j < 2; j++){
-				s.chn[j] = (me->mute || me->qvMute) ? 0 : (int16_t)((float)s.chn[j] * me->volume);
+				s.chn[j] = (int16_t)((float)s.chn[j] * me->volume);
 			}
 
 			stream[i+0] = s.chn[0] & 0xff;
-			stream[i+1] = (s.chn[0] >> 8) & 0xff; 
-			
+			stream[i+1] = (s.chn[0] >> 8) & 0xff;
+
 			stream[i+2] = s.chn[1] & 0xff;
 			stream[i+3] = (s.chn[1] >> 8) & 0xff;
-		}else{
-			stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
+
+			t = s.ts;
+		}
+		
+		else{
+			for(int i = 0; i < len; i += 4){
+				stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
+			}
 		}
 	}
+		
+	if(me->video != 0){
+		if(noSamples){
+			me->video->addTime(1.0 / (double)me->freq * (double)len / 4);
+		}
 
-	if(me->video != 0)
-		me->video->addTime(extraTime);
+		else{
+			double vt = me->video->getTime();
+
+			if(t - vt > 0.0){
+				me->video->addTime((t - vt) + (1.0 / (double)me->freq * (double)len / 4));
+			}
+		}
+	}
 }
-
+	
 Uint32 AudioFallbackTimer(Uint32 interval, void* data)
 {
 	Uint8 buffer[48 * 15 * 2 * 2]; // every 15 ms, so 48 KHz 16 bit stereo
@@ -81,11 +89,52 @@ Uint32 AudioFallbackTimer(Uint32 interval, void* data)
 	return interval;
 }
 
+void Player::emptyQueue()
+{
+	samples.clear();
+}
+
+int Player::getBlockSize()
+{
+	return audioFormat.samples;
+}
+
+int Player::getSampleCount()
+{
+	SDL_LockAudio();
+	int size = samples.size();
+	SDL_UnlockAudio();
+	return size;
+}
+
+void Player::EnqueueSamples(const Sample* buffer, int size)
+{
+	SDL_LockAudio();
+	for(int i = 0; i < size; i++)
+		samples.push(buffer[i]);
+	SDL_UnlockAudio();
+}
+
+int Player::getSampleRate()
+{
+	return audioFormat.freq;
+}
+
+int Player::getChannelCount()
+{
+	return audioFormat.channels;
+}
+
 void Player::PauseAudio(bool val)
 {
-	if(!audioOutputEnabled) return;
+	if(!audioOutputEnabled)
+		return;
 
-	if(!val) InitAudio();
+	if(!val){
+		InitAudio();
+		SDL_PauseAudio(false);
+	}
+
 	else CloseAudio();
 }
 
@@ -106,10 +155,10 @@ void Player::InitAudio()
 	if(initialized) return;
 	FlogD("inititalizing audio");
 
-	SDL_AudioSpec fmt, out;
+	SDL_AudioSpec fmt;
 
 	memset(&fmt, 0, sizeof(SDL_AudioSpec)); 
-	memset(&out, 0, sizeof(SDL_AudioSpec)); 
+	memset(&audioFormat, 0, sizeof(SDL_AudioSpec)); 
 
 	fmt.freq = 48000;
 	fmt.format = AUDIO_S16LSB;
@@ -118,7 +167,7 @@ void Player::InitAudio()
 	fmt.callback = AudioCallback;
 	fmt.userdata = this;
 
-	if(SDL_OpenAudio(&fmt, &out) != 0){
+	if(SDL_OpenAudio(&fmt, &audioFormat) != 0){
 		FlogI("Could not open audio. Using fallback.");
 		audioOutputEnabled = false;
 
@@ -133,20 +182,15 @@ void Player::InitAudio()
 
 	audioOutputEnabled = true;
 
-	if(out.format != fmt.format){
+	if(audioFormat.format != fmt.format){
 		FlogW("audio format mismatch");
 	}else{
 		FlogI("audio format accepted");
 	}
 
-	FlogExpD(out.freq);
-	FlogExpD(out.samples);
-	
 	initialized = true;
 
-	freq = out.freq;
-
-	SDL_PauseAudio(false);
+	freq = audioFormat.freq;
 }
 	
 void Player::SetDims(int nw, int nh, int vw, int vh)
@@ -266,21 +310,14 @@ void Player::Run(IPC& ipc)
 						s->Seek(0, SEEK_SET);
 					}
 
-					video = Video::Create(s, 
-						// error handler
-						[&](Video::Error error, const std::string& msg){
-							if(error < Video::EEof)
-								ipc.WriteMessage("error", msg);
-							else
-								ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
-						},
-						// audio handler
-						[&](const Sample* buffer, int size){
-							SDL_LockAudio();
-							for(int i = 0; i < size; i++)
-								samples.push(buffer[i]);
-							SDL_UnlockAudio();
-						}, 48000, 2, quickViewPlayer ? 5 : 60);
+					auto errorCallback = [&](Video::Error error, const std::string& msg){
+						if(error < Video::EEof)
+							ipc.WriteMessage("error", msg);
+						else
+							ipc.WriteMessage(error == Video::EEof ? "eof" : "unloaded", msg);
+					};
+
+					video = Video::Create(s, errorCallback, this, quickViewPlayer ? 5 : 16);
 				}
 
 				catch (StreamEx ex)
@@ -496,6 +533,8 @@ void Player::Run(IPC& ipc)
 
 	SDL_WaitThread(messageQueueThread, NULL);
 	SDL_DestroyMutex(messageQueueMutex);
+
+	video = 0;
 
 	FlogD("exiting");
 }

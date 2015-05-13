@@ -40,6 +40,7 @@
 #include "log.h"
 #include "bitmap.h"
 #include "flog.h"
+#include "iaudiodevice.h"
 
 class KfPos
 {
@@ -106,8 +107,11 @@ class CVideo : public Video
 	bool drawTimeStamp;
 	bool reportedEof;
 	StreamPtr stream;
-	
-	CVideo(ErrorCallback errorCallback, int frameQueueSize){
+
+	IAudioDevice* audioDevice;
+
+	CVideo(ErrorCallback errorCallback, int frameQueueSize, IAudioDevice* audioDevice) : audioDevice(audioDevice)
+	{
 		this->errorCallback = errorCallback;
 
 		this->frameQueueSize = frameQueueSize;
@@ -162,6 +166,12 @@ class CVideo : public Video
 
 		// Throw away all old frames (timestamp older than now) except for the last
 		// and set the pFrame pointer to that.
+
+/*		if(!frameQueue.empty()){
+			FlogExpD(frameQueue.top().pts);
+		}else{
+			FlogD("framequeue is empty");
+		}*/
 
 		while(!frameQueue.empty() && frameQueue.top().pts < time){
 			freeFrame(&newFrame.avFrame);
@@ -251,10 +261,12 @@ class CVideo : public Video
 
 	/* Seek to given frame */
 	bool seek(int frame, bool exact = false){
+
 		reachedEof = 0;
 		reportedEof = false;
 		frame = std::min(std::max(0, frame), getDurationInFrames());
 		emptyFrameQueue();
+		audioDevice->emptyQueue();
 
 		LogExp(duration);
 		FlogD("Seeking to " << frame << " of " << getDurationInFrames());
@@ -327,7 +339,7 @@ class CVideo : public Video
 		bool success = false;
 		while(!IsEof() && !success){
 			try {
-				while(frameQueue.size() < (unsigned int)frameQueueSize){
+				while(frameQueue.size() < (unsigned int)frameQueueSize || (audioDevice->getSampleCount() < audioDevice->getBlockSize())){
 					decodeFrame(true);
 				}
 
@@ -900,7 +912,7 @@ class CVideo : public Video
 		return -1;
 	}
 
-	bool openFile(StreamPtr stream, AudioCallback audioCallback, int freq, int channels){
+	bool openFile(StreamPtr stream){
 		LogInfo("Trying to load file: " << stream->GetPath());
 
 		int ret;
@@ -955,7 +967,7 @@ class CVideo : public Video
 		audioStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
 
 		if(audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND){
-			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioCallback, freq, channels);
+			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioDevice);
 		}else{
 			LogDebug("no audio stream or unsupported audio codec");
 		}
@@ -1080,22 +1092,22 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 		LogDebug("ffmpeg says: " << tmp);
 	}
 }
-
-VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, AudioCallback audioCallback,
-	int freq, int channels, int frameQueueSize, const std::string& kf)
+	
+VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, IAudioDevice* audioDevice, 
+	int frameQueueSize, const std::string& kf)
 {
 	static bool initialized = false;
 	if(!initialized)
 		av_register_all();
 
-	CVideo* video = new CVideo(errorCallback, frameQueueSize);
+	CVideo* video = new CVideo(errorCallback, frameQueueSize, audioDevice);
 
 	video->setIFrames(kf);
 
 	av_log_set_callback(logCb);
 	av_log_set_level(AV_LOG_WARNING);
 
-	if(!video->openFile(stream, audioCallback, channels, freq)){
+	if(!video->openFile(stream)){
 		errorCallback(EFile, "could not open file");
 		delete video;
 		return 0;

@@ -31,6 +31,7 @@
 #include "avlibs.h"
 
 #include "timehandler.h"
+#include "iaudiodevice.h"
 
 #include <queue>
 #include <functional>
@@ -38,6 +39,7 @@
 class CAudioHandler : public AudioHandler
 {
 	std::function<void(const Sample* buffer, int size)> audioCb;
+	IAudioDevice* audioDevice;
 	int channels;
 	int freq;
 
@@ -53,14 +55,12 @@ class CAudioHandler : public AudioHandler
 	}
 
 	public:
-	CAudioHandler(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, 
-		int channels, int freq)
+	CAudioHandler(AVCodecContext* aCodecCtx, IAudioDevice* audioDevice) : audioDevice(audioDevice)
 	{
 		this->aCodecCtx = aCodecCtx;
 
-		this->audioCb = audioCb;
-		this->channels = channels;
-		this->freq = freq;
+		this->channels = audioDevice->getChannelCount();
+		this->freq = audioDevice->getSampleRate();
 	
 		aCodec = avcodec_find_decoder(aCodecCtx->codec_id);
 
@@ -134,7 +134,7 @@ class CAudioHandler : public AudioHandler
 					smp[i].ts = ts;
 				}
 
-				audioCb(smp, dstSampleCount);
+				audioDevice->EnqueueSamples(smp, dstSampleCount);
 			}
 		}
 
@@ -172,7 +172,7 @@ class CAudioHandler : public AudioHandler
 	}
 };
 
-AudioHandlerPtr AudioHandler::Create(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq)
+AudioHandlerPtr AudioHandler::Create(AVCodecContext* aCodecCtx, IAudioDevice* audioDevice)
 {
-	return AudioHandlerPtr(new CAudioHandler(aCodecCtx, audioCb, channels, freq));
+	return AudioHandlerPtr(new CAudioHandler(aCodecCtx, audioDevice));
 }

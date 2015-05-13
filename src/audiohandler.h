@@ -42,7 +42,7 @@ class AudioHandler
 	virtual const char* getCodec() = 0;
 	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp) = 0;
 
-	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq); 
+	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, class IAudioDevice* audioDevice); 
 };
 
 #endif
