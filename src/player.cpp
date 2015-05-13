@@ -76,7 +76,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			double vt = me->video->getTime();
 
 			if(t - vt > 0.0){
-				me->video->addTime((t - vt) + (1.0 / (double)me->freq * (double)len / 4));
+				me->video->addTime(t - vt);
 			}
 		}
 	}
