@@ -143,7 +143,6 @@ class CVideo : public Video
 		emptyFrameQueue();
 
 		av_free(decFrame);
-		////freeFrame(decFrame);
 		freeFrame(&currentFrame.avFrame);
 
 		LogDebug("end of destructor");
@@ -166,12 +165,6 @@ class CVideo : public Video
 
 		// Throw away all old frames (timestamp older than now) except for the last
 		// and set the pFrame pointer to that.
-
-/*		if(!frameQueue.empty()){
-			FlogExpD(frameQueue.top().pts);
-		}else{
-			FlogD("framequeue is empty");
-		}*/
 
 		while(!frameQueue.empty() && frameQueue.top().pts < time){
 			freeFrame(&newFrame.avFrame);
