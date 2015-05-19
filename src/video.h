@@ -106,8 +106,8 @@ class Video
 	virtual void addTime(double t) = 0;
 	virtual double getTime() = 0;
 	
-	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, AudioCallback audioCallback,
-		int freq, int channels, int frameQueueSize, const std::string& kf = "");
+	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, class IAudioDevice* audioDevice, 
+		int frameQueueSize, const std::string& kf = "");
 };
 
 #endif

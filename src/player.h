@@ -26,6 +26,7 @@
 
 #include <SDL.h>
 
+#include "iaudiodevice.h"
 #include "ipc.h"
 #include "samplequeue.h"
 #include "video.h"
@@ -33,7 +34,7 @@
 
 #include <queue>
 
-class Player
+class Player : public IAudioDevice
 {
 	SampleQueue samples;
 
@@ -41,6 +42,14 @@ class Player
 	void CloseAudio();
 	void SetDims(int nw, int nh, int vw, int vh);
 	static int MessageHandlerThread(void* instance);
+	
+	// IAudioDevice
+	void emptyQueue();
+	int getBlockSize();
+	int getSampleCount();
+	int getSampleRate();
+	int getChannelCount();
+	void EnqueueSamples(const Sample* buffer, int size);
 
 	bool initialized;
 	int w, h;
@@ -49,6 +58,8 @@ class Player
 	float volume;
 	bool mute, qvMute, audioOutputEnabled;
 	bool running;
+
+	SDL_AudioSpec audioFormat;
 
 	SDL_Thread* messageQueueThread;
 	SDL_mutex* messageQueueMutex;
