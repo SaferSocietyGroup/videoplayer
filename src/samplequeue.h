@@ -32,7 +32,8 @@
 #pragma pack(1)
 struct Sample {
 	int16_t chn[2];
-	double ts; 
+	double ts = 0; 
+	int64_t frameIndex = 0;
 };
 #pragma pack(pop)
 

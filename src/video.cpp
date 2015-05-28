@@ -349,11 +349,8 @@ class CVideo : public Video
 			catch(std::runtime_error e){
 				reachedEof++;
 				if(IsEof()){
-					FlogExpD(reachedEof);
+					break;
 				}
-				//}else{
-				//	FlogD("demuxer failed, trying again");
-				//}
 			}
 		}
 	}
@@ -570,7 +567,7 @@ class CVideo : public Video
 
 						ret = TVideo;
 					}else{
-						if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream],timeHandler.getTimeWarp())) <= 0){
+						if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream],timeHandler.getTimeWarp(), addToQueue)) <= 0){
 							bytesDecoded = bytesRemaining; // skip audio
 						}
 					}
