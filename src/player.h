@@ -37,6 +37,9 @@
 class Player : public IAudioDevice
 {
 	SampleQueue samples;
+	Sample lastSample;
+	double audioFrameFrequency = 0;
+	bool audioSkip = false;
 
 	void InitAudio();
 	void CloseAudio();
@@ -75,6 +78,7 @@ class Player : public IAudioDevice
 	void PauseAudio(bool val);
 	void Run(IPC& ipc);
 	static void AudioCallback(void *me, Uint8 *stream, int len);
+	void HandleAudio(Uint8* stream, int len);
 };
 
 #endif

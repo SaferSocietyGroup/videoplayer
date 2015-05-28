@@ -42,6 +42,7 @@ class CAudioHandler : public AudioHandler
 	IAudioDevice* audioDevice;
 	int channels;
 	int freq;
+	int64_t frameIndex = 0;
 	float lastTimeWarp = 0;
 
 	AVCodecContext *aCodecCtx;
@@ -89,7 +90,7 @@ class CAudioHandler : public AudioHandler
 			swr_free(&this->swr);
 	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp){
+	int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToAudioQueue){
 		if(!aCodec)
 			return -1;
 
@@ -130,7 +131,7 @@ class CAudioHandler : public AudioHandler
 
 			int ret = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)frame->data, frame->nb_samples);
 
-			if(ret >= 0){
+			if(ret >= 0 && addToAudioQueue){
 				auto asmp = std::auto_ptr<Sample>(new Sample [dstSampleCount]);
 				Sample* smp = asmp.get();
 
@@ -138,9 +139,11 @@ class CAudioHandler : public AudioHandler
 					smp[i].chn[0] = ((int16_t*)dstBuf[0])[i * 2];
 					smp[i].chn[1] = ((int16_t*)dstBuf[0])[i * 2 + 1];
 					smp[i].ts = ts;
+					smp[i].frameIndex = frameIndex;
 				}
 
 				audioDevice->EnqueueSamples(smp, dstSampleCount);
+				frameIndex++;
 			}
 		}
 

@@ -40,7 +40,7 @@ class AudioHandler
 	virtual int getChannels() = 0;
 	virtual int getBitRate() = 0;
 	virtual const char* getCodec() = 0;
-	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp) = 0;
+	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToAudioQueue) = 0;
 
 	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, class IAudioDevice* audioDevice); 
 };

@@ -36,19 +36,44 @@ typedef std::pair<std::string, std::string> Message;
 
 void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 {
-	Player* me = (Player*)vMe;
-	SampleQueue* samples = &me->samples;
-	
-	double t = 0.0f;
-	bool noSamples = samples->empty();
+	((Player*)vMe)->HandleAudio(stream, len);
+}
+
+void Player::HandleAudio(Uint8* stream, int len)
+{
+	bool noSamples = samples.empty();
+	Sample smp;
+	double vt = 0.0;
+		
+	if(video != 0)
+		vt = video->getTime();
+
+	// on a seek, audio might be far ahead of video,
+	// so on a seek we skip audio until it matches
+	// the current video time
+
+	if(audioSkip){
+		//FlogExpD(samples.empty());
+		while(!samples.empty())
+		{
+			if(samples.front().ts < vt){
+				samples.pop();
+			}else{
+				audioSkip = false;
+				break;
+			}
+		}
+	}
+
+	float useVolume = (qvMute || mute) ? 0.0f : volume;
 
 	for(int i = 0; i < len; i += 4){
-		if(!samples->empty()){
-			Sample s = samples->front();
-			samples->pop();
+		if(!samples.empty()){
+			Sample s = samples.front();
+			samples.pop();
 
 			for(int j = 0; j < 2; j++){
-				s.chn[j] = (int16_t)((float)s.chn[j] * me->volume);
+				s.chn[j] = (int16_t)((float)s.chn[j] * useVolume);
 			}
 
 			stream[i+0] = s.chn[0] & 0xff;
@@ -57,7 +82,7 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			stream[i+2] = s.chn[1] & 0xff;
 			stream[i+3] = (s.chn[1] >> 8) & 0xff;
 
-			t = s.ts;
+			smp = s;
 		}
 		
 		else{
@@ -66,20 +91,38 @@ void Player::AudioCallback(void *vMe, Uint8 *stream, int len)
 			}
 		}
 	}
-		
-	if(me->video != 0){
-		if(noSamples){
-			me->video->addTime(1.0 / (double)me->freq * (double)len / 4);
-		}
 
-		else{
-			double vt = me->video->getTime();
-
-			if(t - vt > 0.0){
-				me->video->addTime(t - vt);
-			}
-		}
+	// keep track of the time between audio frames
+	if(!noSamples && smp.frameIndex != lastSample.frameIndex){
+		audioFrameFrequency = smp.ts - lastSample.ts;
 	}
+
+	if(video != 0){
+		double diff = smp.ts - vt;
+	
+		//FlogExpD(vt);
+		//FlogExpD(smp.ts);
+		//FlogExpD(diff);
+
+		// add the difference between the last audio sample's timestamp and the current video time stamp
+		// to the video time
+
+		double addTime = std::max(0.0, diff);
+
+		// if there are no samples (presumably the video has no audio track)
+		// or, if the rate at which we get audio frames is too low 
+		// (and the audio time is not too far ahead of the video time),
+		// increase the video time by the audio rate instead
+
+		if(noSamples || (smp.frameIndex == lastSample.frameIndex && vt < smp.ts + audioFrameFrequency)){
+			addTime = 1.0 / (double)freq * (double)len / 4;
+		}
+
+		video->addTime(addTime);
+	}
+
+	if(!noSamples)
+		lastSample = smp;
 }
 	
 Uint32 AudioFallbackTimer(Uint32 interval, void* data)
@@ -448,6 +491,7 @@ void Player::Run(IPC& ipc)
 					t = std::min(std::max(0.0f, t), 1.0f);
 
 					video->seek(t * (float)video->getDurationInFrames(), false);
+					audioSkip = true;
 				}
 
 				else if(type == "setdims"){
@@ -527,12 +571,12 @@ void Player::Run(IPC& ipc)
 			FlogD("dying bye bye");
 			running = false;
 		}
-
-		//Sleep(1);
 	}
 
 	SDL_WaitThread(messageQueueThread, NULL);
 	SDL_DestroyMutex(messageQueueMutex);
+
+	SDL_Quit();
 
 	video = 0;
 
