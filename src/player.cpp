@@ -53,7 +53,6 @@ void Player::HandleAudio(Uint8* stream, int len)
 	// the current video time
 
 	if(audioSkip){
-		//FlogExpD(samples.empty());
 		while(!samples.empty())
 		{
 			if(samples.front().ts < vt){
@@ -100,10 +99,6 @@ void Player::HandleAudio(Uint8* stream, int len)
 	if(video != 0){
 		double diff = smp.ts - vt;
 	
-		//FlogExpD(vt);
-		//FlogExpD(smp.ts);
-		//FlogExpD(diff);
-
 		// add the difference between the last audio sample's timestamp and the current video time stamp
 		// to the video time
 
