@@ -24,21 +24,25 @@
 #ifndef TIMEHANDLER_H
 #define TIMEHANDLER_H
 
-class TimeHandler{
+#include <memory>
+
+#include "IAudioDevice.h"
+
+typedef std::shared_ptr<class TimeHandler> TimeHandlerPtr;
+
+class TimeHandler
+{
 	public:
-	TimeHandler();
-	double getTime();
-	double getTimeWarp();
-	void pause();
-	void play();
-	bool getPaused();
-	void setTimeWarp(double tps);
-	void setTime(double t);
-	void addTime(double t);
-		
-	private:
-	double time, warp;
-	bool paused;
+	virtual double GetTime() = 0;
+	virtual double GetTimeWarp() = 0;
+	virtual void Pause() = 0;
+	virtual void Play() = 0;
+	virtual bool GetPaused() = 0;
+	virtual void SetTimeWarp(double tps) = 0;
+	virtual void SetTime(double t) = 0;
+	virtual void AddTime(double t) = 0;
+
+	static TimeHandlerPtr Create(IAudioDevicePtr audioDevice);
 };
 
 #endif

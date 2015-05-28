@@ -7,9 +7,8 @@
 class CSdlAudioDevice : public SdlAudioDevice
 {
 	public:
-	std::queue<Sample> queue;
 	SDL_AudioSpec spec;
-	double dt = 0.0;
+	std::function<int(int16_t* data, int nSamples)> update;
 	
 	void SetPaused(bool paused)
 	{
@@ -23,30 +22,21 @@ class CSdlAudioDevice : public SdlAudioDevice
 
 	void FillBufferCallback(Uint8 *stream, int len)
 	{
-		for(int i = 0; i < len; i += 4){
-			if(!queue.empty()){
-				Sample s = queue.front();
-				queue.pop();
+		int nSmp = len / 2 / spec.channels;
+		int16_t* data = (int16_t*)stream;
 
-				for(int j = 0; j < 2; j++){
-					s.chn[j] = (int16_t)((float)s.chn[j] * volume);
-				}
+		int fetched = update(data, nSmp);
 
-				stream[i+0] = s.chn[0] & 0xff;
-				stream[i+1] = (s.chn[0] >> 8) & 0xff;
-
-				stream[i+2] = s.chn[1] & 0xff;
-				stream[i+3] = (s.chn[1] >> 8) & 0xff;
-			}else{
-				stream[i] = stream[i+1] = stream[i+2] = stream[i+3] = 0;
-			}
+		for(int i = fetched; i < nSmp; i++){
+			data[i*2+0] = 0;
+			data[i*2+1] = 0;
 		}
-		
-		dt += (double)(len / (int)spec.channels / 2) * 1.0 / (double)spec.freq;
 	}
 
-	bool Init(int freq, int channels)
+	bool Init(int freq, int channels, std::function<int(int16_t* data, int nSamples)> update)
 	{
+		this->update = update;
+
 		SDL_AudioSpec fmt;
 
 		memset(&fmt, 0, sizeof(SDL_AudioSpec));
@@ -69,15 +59,6 @@ class CSdlAudioDevice : public SdlAudioDevice
 		return true;
 	}
 	
-	double GetDeltaTime()
-	{
-		SDL_LockAudio();
-		double ret = dt;
-		dt = 0.0;
-		SDL_UnlockAudio();
-		return ret;
-	}
-	
 	int GetRate()
 	{
 		return spec.freq;
@@ -88,22 +69,17 @@ class CSdlAudioDevice : public SdlAudioDevice
 		return spec.channels;
 	}
 
-	void ClearQueue()
+	int GetBlockSize()
 	{
-		SDL_LockAudio();
-
-		while(!queue.empty())
-			queue.pop();
-
-		SDL_UnlockAudio();
+		return spec.samples;
 	}
-
-	void Enqueue(const Sample* buffer, int size)
+	
+	void Lock(bool value)
 	{
-		SDL_LockAudio();
-		for(int i = 0; i < size; i++)
-			queue.push(buffer[i]);
-		SDL_UnlockAudio();
+		if(value)
+			SDL_LockAudio();
+		else
+			SDL_UnlockAudio();
 	}
 };
 

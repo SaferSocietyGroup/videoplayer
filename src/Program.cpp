@@ -23,7 +23,7 @@ class CProgram : public Program
 	
 	VideoPtr video;
 
-	IAudioDevicePtr audio;
+	SdlAudioDevicePtr audio;
 
 	bool done = false;
 	SDL_Overlay* overlay = 0;
@@ -34,7 +34,6 @@ class CProgram : public Program
 	SDL_Surface* window;
 
 	Video::ErrorCallback handleError;
-	Video::AudioCallback handleAudio;
 
 	void HandleCommand(Command cmd)
 	{
@@ -57,19 +56,15 @@ class CProgram : public Program
 				break;
 
 			case CTSeek:
-				audio->ClearQueue();
-
 				if(video)
 					video->seek(cmd.args[0].f);
 				break;
 
 			case CTLoad: {
-					audio->ClearQueue();
-
 					FileStreamPtr fs = FileStream::Create();
 					fs->Open(Tools::WstrToStr(cmd.args[0].str), false);
 
-					video = Video::Create(fs, handleError, handleAudio, audio->GetRate(), audio->GetChannels(), 64);
+					video = Video::Create(fs, handleError, audio, 64);
 
 					if(overlay)
 						SDL_FreeYUVOverlay(overlay);
@@ -97,15 +92,16 @@ class CProgram : public Program
 		FlogAssert(window, "could not set video mode");
 
 		audio = SdlAudioDevice::Create();
-		std::dynamic_pointer_cast<SdlAudioDevice>(audio)->Init(48000, 2);
+		audio->Init(48000, 2, [&](int16_t* data, int nSamples) -> int {
+			if(video != 0) 
+				return video->fetchAudio(data, nSamples);
+
+			return 0;
+		});
 
 		SDL_Event event;
 				
 		handleError = [&](Video::Error e, const std::string& msg){
-		};
-
-		handleAudio = [&](const Sample* buffer, int size){
-			audio->Enqueue(buffer, size);
 		};
 
 		while(!done){
@@ -128,7 +124,7 @@ class CProgram : public Program
 			}
 
 			if(video && overlay){
-				bool updated = video->update(audio->GetDeltaTime());
+				bool updated = video->update(0);
 
 				if(updated){
 					SDL_LockYUVOverlay(overlay);

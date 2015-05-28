@@ -31,7 +31,7 @@
 
 #include "avlibs.h"
 #include "Stream.h"
-#include "Sample.h"
+#include "IAudioDevice.h"
 
 class Video;
 typedef std::shared_ptr<Video> VideoPtr;
@@ -56,10 +56,10 @@ class Video
 	};
 	
 	typedef std::function<void(Error, const std::string&)> ErrorCallback;
-	typedef std::function<void(const Sample* buffer, int size)> AudioCallback;
 
 	virtual ~Video(){};
-
+	
+	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
 	virtual bool update(double deltaTime) = 0;
 	virtual void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h) = 0;
 
@@ -90,8 +90,7 @@ class Video
 	virtual bool getPaused() = 0;
 	virtual double getTime() = 0;
 	
-	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, AudioCallback audioCallback,
-		int freq, int channels, int frameQueueSize);
+	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, IAudioDevicePtr audioDevice, int frameQueueSize);
 };
 
 #endif
