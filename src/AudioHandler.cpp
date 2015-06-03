@@ -21,47 +21,52 @@
  * along with NetClean VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define DEBUG
-#include "Flog.h"
-#include "AudioHandler.h"
-
+#include <queue>
+#include <functional>
 #include <algorithm>
 #include <SDL.h>
 
+#include "Flog.h"
+#include "AudioHandler.h"
 #include "avlibs.h"
-
 #include "TimeHandler.h"
 
-#include <queue>
-#include <functional>
+struct Sample {
+	int16_t chn[2];
+	double ts = 0.0f;
+	int frameIndex = 0;
+};
 
 class CAudioHandler : public AudioHandler
 {
-	std::function<void(const Sample* buffer, int size)> audioCb;
-	int channels;
-	int freq;
-
+	IAudioDevicePtr device;
 	AVCodecContext *aCodecCtx;
 	AVCodec *aCodec;
 	SwrContext* swr;
 		
 	uint8_t** dstBuf;
 	int dstLineSize;
+	int frameIndex = 0;
+	bool skip = false;
+	float volume = 1.0f;
+	bool qvMute = false, mute = false;
+	TimeHandlerPtr timeHandler;
+	Sample lastSample;
+	double audioFrameFrequency;
+	
+	std::queue<Sample> queue;
 	
 	double timeFromPts(uint64_t pts, AVRational timeBase){
 		return (double)pts * av_q2d(timeBase);
 	}
 
 	public:
-	CAudioHandler(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, 
-		int channels, int freq)
+	CAudioHandler(AVCodecContext* aCodecCtx, IAudioDevicePtr audioDevice, TimeHandlerPtr timeHandler)
 	{
+		this->device = audioDevice;
 		this->aCodecCtx = aCodecCtx;
+		this->timeHandler = timeHandler;
 
-		this->audioCb = audioCb;
-		this->channels = channels;
-		this->freq = freq;
-	
 		aCodec = avcodec_find_decoder(aCodecCtx->codec_id);
 
 		if(!aCodec || avcodec_open2(aCodecCtx, aCodec, NULL) < 0)
@@ -87,8 +92,92 @@ class CAudioHandler : public AudioHandler
 		if(this->swr)
 			swr_free(&this->swr);
 	}
+	
+	int getAudioQueueSize()
+	{
+		return (int)queue.size();
+	}
+	
+	void clearQueue()
+	{
+		while(!queue.empty()){
+			queue.pop();
+		}
+	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp){
+	int fetchAudio(int16_t* data, int nSamples)
+	{
+		int fetched = 0;
+		bool noSamples = queue.empty();
+		Sample smp;
+		double vt = 0.0;
+		int freq = device->GetRate();
+
+		vt = timeHandler->GetTime();
+
+		// on a seek, audio might be far ahead of video,
+		// so on a seek we skip audio until it matches
+		// the current video time
+
+		if(skip){
+			while(!queue.empty())
+			{
+				if(queue.front().ts < vt){
+					queue.pop();
+				}else{
+					skip = false;
+					break;
+				}
+			}
+		}
+
+		float useVolume = (qvMute || mute) ? 0.0f : volume;
+
+		for(int i = 0; i < nSamples; i++){
+			if(queue.empty())
+				break;
+
+			Sample s = queue.front();
+			queue.pop();
+
+			data[i*2+0] = (int16_t)((float)s.chn[0] * useVolume);
+			data[i*2+1] = (int16_t)((float)s.chn[1] * useVolume);
+
+			smp = s;
+
+			fetched++;
+		}
+
+		// keep track of the time between audio frames
+		if(!noSamples && smp.frameIndex != lastSample.frameIndex){
+			audioFrameFrequency = smp.ts - lastSample.ts;
+		}
+
+		double diff = smp.ts - vt;
+
+		// add the difference between the last audio sample's timestamp and the current video time stamp
+		// to the video time
+
+		double addTime = std::max(0.0, diff);
+
+		// if there are no queue (presumably the video has no audio track)
+		// or, if the rate at which we get audio frames is too low 
+		// (and the audio time is not too far ahead of the video time),
+		// increase the video time by the audio rate instead
+
+		if(noSamples || (smp.frameIndex == lastSample.frameIndex && vt < smp.ts + audioFrameFrequency)){
+			addTime = 1.0 / (double)freq * (double)nSamples;
+		}
+
+		timeHandler->AddTime(addTime);
+
+		if(!noSamples)
+			lastSample = smp;
+
+		return fetched;
+	}
+
+	int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToQueue){
 		if(!aCodec)
 			return -1;
 
@@ -99,12 +188,15 @@ class CAudioHandler : public AudioHandler
 		int bytesDecoded = avcodec_decode_audio4(aCodecCtx, frame, &got_frame, &packet);
 
 		if(bytesDecoded >= 0 && got_frame){
+			int freq = device->GetRate();
+			int channels = device->GetChannels();
+
 			if(!this->swr){
 				int64_t chLayout = frame->channel_layout != 0 ? frame->channel_layout : 
 					av_get_default_channel_layout(frame->channels);
 
-				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(this->channels), 
-					AV_SAMPLE_FMT_S16, this->freq, chLayout, (AVSampleFormat)frame->format, 
+				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(channels), 
+					AV_SAMPLE_FMT_S16, freq, chLayout, (AVSampleFormat)frame->format, 
 					frame->sample_rate, 0, NULL);
 
 				FlogAssert(this->swr, "error allocating swr");
@@ -112,7 +204,7 @@ class CAudioHandler : public AudioHandler
 				swr_init(this->swr);
 
 				int ret = av_samples_alloc_array_and_samples(&dstBuf, &dstLineSize, 2, 
-					this->freq * this->channels, AV_SAMPLE_FMT_S16, 0);
+					freq * channels, AV_SAMPLE_FMT_S16, 0);
 
 				FlogAssert(ret >= 0, "error allocating samples: " << ret);
 			}
@@ -123,23 +215,30 @@ class CAudioHandler : public AudioHandler
 
 			int ret = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)frame->data, frame->nb_samples);
 
-			if(ret >= 0){
-				auto asmp = std::auto_ptr<Sample>(new Sample [dstSampleCount]);
-				Sample* smp = asmp.get();
-
+			if(ret >= 0 && addToQueue){
+				device->Lock(true);
 				for(int i = 0; i < dstSampleCount; i++){
-					smp[i].chn[0] = ((int16_t*)dstBuf[0])[i * 2];
-					smp[i].chn[1] = ((int16_t*)dstBuf[0])[i * 2 + 1];
-					smp[i].ts = ts;
+					Sample smp;
+					smp.chn[0] = ((int16_t*)dstBuf[0])[i * 2];
+					smp.chn[1] = ((int16_t*)dstBuf[0])[i * 2 + 1];
+					smp.ts = ts;
+					smp.frameIndex = frameIndex;
+					queue.push(smp);
 				}
-
-				audioCb(smp, dstSampleCount);
+				device->Lock(false);
 			}
+			
+			frameIndex++;
 		}
 
 		av_frame_free(&frame);
 
 		return bytesDecoded;
+	}
+	
+	void onSeek()
+	{
+		skip = true;
 	}
 
 	int getSampleRate(){
@@ -171,7 +270,7 @@ class CAudioHandler : public AudioHandler
 	}
 };
 
-AudioHandlerPtr AudioHandler::Create(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq)
+AudioHandlerPtr AudioHandler::Create(AVCodecContext* aCodecCtx, IAudioDevicePtr device, TimeHandlerPtr timeHandler)
 {
-	return AudioHandlerPtr(new CAudioHandler(aCodecCtx, audioCb, channels, freq));
+	return AudioHandlerPtr(new CAudioHandler(aCodecCtx, device, timeHandler));
 }

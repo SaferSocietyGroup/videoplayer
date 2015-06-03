@@ -24,54 +24,83 @@
 #include "TimeHandler.h"
 
 #include <iostream>
-//#define DEBUG
-#include "Flog.h"
 #include "avlibs.h"
 
-TimeHandler::TimeHandler()
+class CTimeHandler : public TimeHandler
 {
-	time = 0;
-	warp = 1;
-	paused = true;
-}
+	public:
+	IAudioDevicePtr audioDevice;
 
-bool TimeHandler::getPaused()
-{
-	return paused;
-}
+	double time = 0.0;
+	double warp = 1.0;
+	bool paused = true;
 
-void TimeHandler::pause()
-{
-	paused = true;
-}
+	CTimeHandler(IAudioDevicePtr audioDevice) : audioDevice(audioDevice)
+	{
+	}
 
-void TimeHandler::play()
-{
-	paused = false;
-}
+	bool GetPaused()
+	{
+		audioDevice->Lock(true);
+		bool ret = paused;
+		audioDevice->Lock(false);
+		return ret;
+	}
 
-void TimeHandler::setTime(double t)
-{
-	time = t;
-}
+	void Pause()
+	{
+		audioDevice->Lock(true);
+		paused = true;
+		audioDevice->Lock(false);
+	}
 
-void TimeHandler::setTimeWarp(double tps)
-{
-	warp = tps;
-}
+	void Play()
+	{
+		audioDevice->Lock(true);
+		paused = false;
+		audioDevice->Lock(false);
+	}
 
-double TimeHandler::getTimeWarp()
-{
-	return warp;
-}
+	void SetTime(double t)
+	{
+		audioDevice->Lock(true);
+		time = t;
+		audioDevice->Lock(false);
+	}
 
-double TimeHandler::getTime()
-{
-	return time;
-}
+	void SetTimeWarp(double tps)
+	{
+		audioDevice->Lock(true);
+		warp = tps;
+		audioDevice->Lock(false);
+	}
 
-void TimeHandler::addTime(double t)
+	double GetTimeWarp()
+	{
+		audioDevice->Lock(true);
+		double ret = warp;
+		audioDevice->Lock(false);
+		return ret;
+	}
+
+	double GetTime()
+	{
+		audioDevice->Lock(true);
+		double ret = time;
+		audioDevice->Lock(false);
+		return ret;
+	}
+
+	void AddTime(double t)
+	{
+		audioDevice->Lock(true);
+		if(!paused)
+			time += t * warp;
+		audioDevice->Lock(false);
+	}
+};
+
+TimeHandlerPtr TimeHandler::Create(IAudioDevicePtr audioDevice)
 {
-	if(!paused)
-		time += t * warp;
+	return std::make_shared<CTimeHandler>(audioDevice);
 }

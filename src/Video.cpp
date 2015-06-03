@@ -69,8 +69,9 @@ class CVideo : public Video
 	int w, h;
 	int backSeek;
 	
+	IAudioDevicePtr audioDevice;
 	AudioHandlerPtr audioHandler;
-	TimeHandler timeHandler;
+	TimeHandlerPtr timeHandler;
 
 	AVFormatContext *pFormatCtx;
 	int audioStream, videoStream;
@@ -118,7 +119,6 @@ class CVideo : public Video
 		stepIntoQueue = true;
 		reportedEof = false;
 
-		timeHandler.pause();
 		decFrame = avcodec_alloc_frame();
 	}
 
@@ -144,10 +144,10 @@ class CVideo : public Video
 
 		if(stepIntoQueue && !frameQueue.empty()){
 			stepIntoQueue = false;
-			timeHandler.setTime(frameQueue.top().pts + .001);
+			timeHandler->SetTime(frameQueue.top().pts + .001);
 		}
 
-		double time = timeHandler.getTime();
+		double time = timeHandler->GetTime();
 
 		Frame newFrame;
 
@@ -186,7 +186,7 @@ class CVideo : public Video
 		if(frameQueue.empty())
 			return;
 
-		double time = timeHandler.getTime();
+		double time = timeHandler->GetTime();
 		double pts = frameQueue.top().pts;
 
 		// If the next frame is more than one second into the future or the past, 
@@ -196,6 +196,11 @@ class CVideo : public Video
 			FlogD("adjusted time");
 			//timeHandler.setTime(pts);
 		}
+	}
+	
+	int fetchAudio(int16_t* data, int nSamples)
+	{
+		return audioHandler->fetchAudio(data, nSamples);
 	}
 
 	bool update(double deltaTime)
@@ -249,6 +254,7 @@ class CVideo : public Video
 		reachedEof = 0;
 		reportedEof = false;
 		emptyFrameQueue();
+		audioHandler->clearQueue();
 
 		if(!seekTs(ts)){
 			// Try to seek with raw byte seeking
@@ -263,24 +269,26 @@ class CVideo : public Video
 			FlogD("used seekTs");
 		}
 
-		timeHandler.setTime(lastPts);
+		timeHandler->SetTime(lastPts);
 		stepIntoQueue = true;
 
 		reachedEof = 0;
 		reportedEof = false;
+
+		audioHandler->onSeek();
 
 		return true;
 	}
 
 	/* Step to next frame */
 	bool step(){
-		float t = timeHandler.getTime(), fps = getFrameRate();
-		timeHandler.setTime((t * fps + 1.0) / fps);
+		float t = timeHandler->GetTime(), fps = getFrameRate();
+		timeHandler->SetTime((t * fps + 1.0) / fps);
 		return true;
 	}
 
 	bool stepBack(){
-		float t = timeHandler.getTime(), fps = getFrameRate();
+		float t = timeHandler->GetTime(), fps = getFrameRate();
 		return seek(floorf(t * fps - 2.0));
 	}
 
@@ -288,14 +296,9 @@ class CVideo : public Video
 		bool success = false;
 		while(!IsEof() && !success){
 			try {
-				while(frameQueue.size() < (unsigned int)frameQueueSize){
+				while(frameQueue.size() < (unsigned int)frameQueueSize || (audioHandler->getAudioQueueSize() < audioDevice->GetBlockSize())){
 					decodeFrame(true);
 				}
-
-				/*while(!frameQueue.empty()){
-					FlogExpD(frameQueue.top().pts);
-					frameQueue.pop();
-				}*/
 
 				success = true;
 				reachedEof = 0;
@@ -307,9 +310,6 @@ class CVideo : public Video
 				if(IsEof()){
 					FlogExpD(reachedEof);
 				}
-				//}else{
-				//	FlogD("demuxer failed, trying again");
-				//}
 			}
 		}
 	}
@@ -318,7 +318,7 @@ class CVideo : public Video
 		if(IsEof())
 			errorCallback(EEof, "eof");
 		else
-			timeHandler.play();
+			timeHandler->Play();
 	}
 
 	int getWidth(){
@@ -417,7 +417,7 @@ class CVideo : public Video
 	}
 
 	void setPlaybackSpeed(double speed){
-		timeHandler.setTimeWarp(speed);
+		timeHandler->SetTimeWarp(speed);
 	}
 
 	FrameType decodeFrame(bool addToQueue, bool demux = true){
@@ -473,7 +473,7 @@ class CVideo : public Video
 
 						ret = TVideo;
 					}else{
-						if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream],timeHandler.getTimeWarp())) <= 0){
+						if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream], timeHandler->GetTimeWarp(), addToQueue)) <= 0){
 							bytesDecoded = bytesRemaining; // skip audio
 						}
 					}
@@ -606,11 +606,15 @@ class CVideo : public Video
 		}
 	}
 
-	bool openFile(StreamPtr stream, AudioCallback audioCallback, int freq, int channels){
+	bool openFile(StreamPtr stream, IAudioDevicePtr audioDevice){
 		FlogI("Trying to load file: " << stream->GetPath());
 
 		int ret;
 		this->stream = stream;
+		this->audioDevice = audioDevice;
+		timeHandler = TimeHandler::Create(audioDevice);
+		
+		timeHandler->Pause();
 
 		pFormatCtx = avformat_alloc_context();
 		pFormatCtx->pb = stream->GetAVIOContext();
@@ -661,7 +665,7 @@ class CVideo : public Video
 		audioStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
 
 		if(audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND){
-			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioCallback, freq, channels);
+			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioDevice, timeHandler);
 		}else{
 			FlogD("no audio stream or unsupported audio codec");
 		}
@@ -739,19 +743,19 @@ class CVideo : public Video
 		return audioHandler->getChannels();
 	}
 	void pause(){
-		timeHandler.pause();
+		timeHandler->Pause();
 	}
 
 	bool getPaused(){
-		return timeHandler.getPaused();
+		return timeHandler->GetPaused();
 	}
 
 	void addTime(double t){
-		timeHandler.addTime(t);
+		timeHandler->AddTime(t);
 	}
 	
 	double getTime(){
-		return timeHandler.getTime();
+		return timeHandler->GetTime();
 	}
 };
 
@@ -787,7 +791,7 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 	}
 }
 
-VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, AudioCallback audioCallback, int freq, int channels, int frameQueueSize)
+VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, IAudioDevicePtr audioDevice, int frameQueueSize)
 {
 	static bool initialized = false;
 	if(!initialized)
@@ -798,7 +802,7 @@ VideoPtr Video::Create(StreamPtr stream, ErrorCallback errorCallback, AudioCallb
 	av_log_set_callback(logCb);
 	av_log_set_level(AV_LOG_WARNING);
 
-	if(!video->openFile(stream, audioCallback, channels, freq)){
+	if(!video->openFile(stream, audioDevice)){
 		errorCallback(EFile, "could not open file");
 		delete video;
 		return 0;

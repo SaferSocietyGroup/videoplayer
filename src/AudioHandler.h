@@ -27,11 +27,11 @@
 #include <functional>
 #include <memory>
 
-class AudioHandler;
-typedef std::shared_ptr<AudioHandler> AudioHandlerPtr;
-
 #include "avlibs.h"
-#include "Sample.h"
+#include "IAudioDevice.h"
+#include "TimeHandler.h"
+
+typedef std::shared_ptr<class AudioHandler> AudioHandlerPtr;
 
 class AudioHandler
 {
@@ -40,9 +40,13 @@ class AudioHandler
 	virtual int getChannels() = 0;
 	virtual int getBitRate() = 0;
 	virtual const char* getCodec() = 0;
-	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp) = 0;
+	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToQueue) = 0;
+	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
+	virtual void onSeek() = 0;
+	virtual void clearQueue() = 0;
+	virtual int getAudioQueueSize() = 0;
 
-	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, std::function<void(const Sample* buffer, int size)> audioCb, int channels, int freq); 
+	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, IAudioDevicePtr device, TimeHandlerPtr timeHandler); 
 };
 
 #endif
