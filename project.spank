@@ -9,8 +9,6 @@ cflags           std=c++0x Wall Wno-deprecated-declarations
 
 lib-static       libavdevice libavformat libavcodec libavfilter libswscale libswresample libavutil  sdl
 
-#ldflags         mconsole 
-
 # link statically
 ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'"
 
@@ -21,6 +19,7 @@ depends          local-file-stream-client-native:32bit-static
 
 [*debug: common]
 cflags           O0
+ldflags          mconsole 
 
 [release: common]
 cflags           O3

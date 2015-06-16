@@ -3,6 +3,7 @@
 #include "Flog.h"
 
 #include <iomanip>
+#include <vector>
 
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
@@ -65,6 +66,29 @@ class CPipe : public Pipe
 			throw PipeException(Str("pipe write length mismatch, bytes written: " << bw << ", expected write length: " << size));
 	}
 
+	std::wstring DecodeUTF8(const char* buffer, int byteSize)
+	{
+		if(byteSize == 0)
+			return L"";
+
+		int requiredSize = MultiByteToWideChar(CP_UTF8, 0, buffer, byteSize, 0, 0);
+		std::wstring s(requiredSize, L' ');
+		int written = MultiByteToWideChar(CP_UTF8, 0, buffer, byteSize, &s[0], s.size());
+
+		if(written == 0)
+			throw PipeException("failed to decode UTF8");
+
+		return s;
+	}
+
+	std::string EncodeUTF8(const std::wstring& str)
+	{
+		int byteSize = WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), 0, 0, 0, 0);
+		std::string s(byteSize, ' ');
+		WideCharToMultiByte(CP_UTF8, 0, str.data(), str.size(), &s[0], s.size(), 0, 0);
+		return s;
+	}
+
 	void Read(char* buffer, size_t size)
 	{
 		DWORD br;
@@ -78,6 +102,9 @@ class CPipe : public Pipe
 
 			total += br;
 		}
+
+		if(total != size)
+			throw PipeException(Str("pipe read length mismatch, bytes read: " << br << ", expected write length: " << size));
 	}
 
 	void WriteInt(const void* v, int size)
@@ -195,17 +222,19 @@ class CPipe : public Pipe
 	
 	void WriteString(const std::wstring& str)
 	{
-		WriteLEB128(str.size() * 2);
-		Write((const char*)str.data(), str.size() * 2);
+		std::string s8 = EncodeUTF8(str);
+		WriteLEB128(s8.size());
+		Write(s8.data(), s8.size());
 	}
 
 	void ReadString(std::wstring& str)
 	{
 		int size = ReadLEB128();
-		// TODO handle multi word characters
 
-		str.resize(size / 2);
-		Read((char*)&str[0], size);
+		std::vector<char> buffer(size);
+		Read(&buffer[0], size);
+
+		str = DecodeUTF8(buffer.data(), buffer.size());
 	}
 	
 	void Close()

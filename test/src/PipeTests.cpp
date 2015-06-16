@@ -257,7 +257,7 @@ class CPipeTests : public PipeTests
 			for(std::wstring s : strs){
 				std::wstring r;
 				client->ReadString(r);
-				TAssert(s == r, "string mismatch");
+				TAssert(s == r, "string mismatch, got: '" << Tools::WstrToStr(r) << "' expected: '" << Tools::WstrToStr(s) << "'");
 			}
 		});
 

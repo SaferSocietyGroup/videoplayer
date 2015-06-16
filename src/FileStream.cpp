@@ -40,12 +40,14 @@ class CFileStream : public FileStream
 		std::string mode = rw ? "rb" : "rwb";
 		f = fopen(filename.c_str(), mode.c_str());
 
-		fseek(f, 0, SEEK_END);
-		fileSize = ftell(f);
-		fseek(f, 0, SEEK_SET);
+		FlogExpD(filename);
 
 		if(!f)
 			throw StreamEx(Str("could not open file: " << filename));
+		
+		fseek(f, 0, SEEK_END);
+		fileSize = ftell(f);
+		fseek(f, 0, SEEK_SET);
 
 		this->filename = filename;
 		int size = FF_INPUT_BUFFER_PADDING_SIZE + 1024 * 32;

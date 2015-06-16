@@ -44,7 +44,7 @@ class CCommandQueue : public CommandQueue
 					uint32_t magic = pipe->ReadUInt32();
 
 					if(magic != MAGIC)
-						throw CommandQueueException("corrupt message (incorrect magic at start of message)");
+						throw CommandQueueException(Str("corrupt message (incorrect magic at start of message), magic: " << std::hex << magic));
 					
 					Command cmd;
 					
