@@ -120,16 +120,63 @@ void Player::HandleAudio(Uint8* stream, int len)
 		lastSample = smp;
 }
 	
-Uint32 AudioFallbackTimer(Uint32 interval, void* data)
+int AudioFallbackThread(void* data)
 {
-	Uint8 buffer[48 * 15 * 2 * 2]; // every 15 ms, so 48 KHz 16 bit stereo
-	Player::AudioCallback(data, buffer, sizeof(buffer));
-	return interval;
+	FlogD("starting audio fallback thread");
+
+	Player* me = (Player*)data;
+
+	SDL_AudioSpec fmt = me->audioFormat;
+
+	int tick = 0;
+	int maxSize = 10000;
+	uint8_t buffer[maxSize];
+
+	while(me->running){
+		int elapsed = SDL_GetTicks() - tick;
+		tick = SDL_GetTicks();
+
+		bool paused = false;
+
+		SDL_LockMutex(me->noAudioMutex);
+
+		if(me->video != 0)
+			paused = me->video->getPaused();
+
+		if(!paused){
+			int size = (float)(fmt.freq * fmt.channels * 2) / 1000.0f * (float)elapsed;
+			Player::AudioCallback(data, buffer, std::min(size, maxSize));
+		}
+
+		SDL_UnlockMutex(me->noAudioMutex);
+
+		SDL_Delay(8);
+	}
+
+	return 0;
 }
 
 void Player::emptyQueue()
 {
+	LockAudio();
 	samples.clear();
+	UnlockAudio();
+}
+	
+void Player::LockAudio()
+{
+	if(audioOutputEnabled)
+		SDL_LockAudio();
+	else
+		SDL_LockMutex(noAudioMutex);
+}
+
+void Player::UnlockAudio()
+{
+	if(audioOutputEnabled)
+		SDL_UnlockAudio();
+	else
+		SDL_UnlockMutex(noAudioMutex);
 }
 
 int Player::getBlockSize()
@@ -139,18 +186,18 @@ int Player::getBlockSize()
 
 int Player::getSampleCount()
 {
-	SDL_LockAudio();
+	LockAudio();
 	int size = samples.size();
-	SDL_UnlockAudio();
+	UnlockAudio();
 	return size;
 }
 
 void Player::EnqueueSamples(const Sample* buffer, int size)
 {
-	SDL_LockAudio();
+	LockAudio();
 	for(int i = 0; i < size; i++)
 		samples.push(buffer[i]);
-	SDL_UnlockAudio();
+	UnlockAudio();
 }
 
 int Player::getSampleRate()
@@ -181,9 +228,6 @@ void Player::CloseAudio()
 	if(!initialized) return;
 	FlogD("closing audio");
 
-	if(!audioOutputEnabled)
-		SDL_RemoveTimer(noAudioTimer);
-
 	SDL_CloseAudio();
 	initialized = false;
 }
@@ -209,10 +253,16 @@ void Player::InitAudio()
 		FlogI("Could not open audio. Using fallback.");
 		audioOutputEnabled = false;
 
-		noAudioTimer = SDL_AddTimer(15, AudioFallbackTimer, this);
-		FlogAssert(noAudioTimer != 0, "could not initialize audio timer");
-		
-		//SDL_CreateThread(AudioFallbackThread, this);
+		//int interval = (1000 * fmt.samples) / (fmt.freq * fmt.channels * 2);
+		int interval = 10;
+
+		FlogI("Fallback timer set to: " << interval << " ms.");
+
+		noAudioThread = SDL_CreateThread(AudioFallbackThread, (void*)this);
+		noAudioMutex = SDL_CreateMutex();
+
+		// the set the "null" audio parameters to 48 KHz 16 bit stereo
+		audioFormat = fmt;		
 
 		initialized = true;
 		return;
@@ -328,8 +378,7 @@ void Player::Run(IPC& ipc)
 				keepAliveTimer = SDL_GetTicks();
 
 			if(type == "load" || type == "lfsc_load"){
-				samples.clear();
-
+				emptyQueue();
 				StreamPtr s;
 
 				FlogD("trying to load: " << message << " (" << type << ")");
@@ -481,7 +530,7 @@ void Player::Run(IPC& ipc)
 					float t;
 					s >> t;
 					FlogD("seek " << t);
-					samples.clear();
+					emptyQueue();
 
 					t = std::min(std::max(0.0f, t), 1.0f);
 
