@@ -253,11 +253,6 @@ void Player::InitAudio()
 		FlogI("Could not open audio. Using fallback.");
 		audioOutputEnabled = false;
 
-		//int interval = (1000 * fmt.samples) / (fmt.freq * fmt.channels * 2);
-		int interval = 10;
-
-		FlogI("Fallback timer set to: " << interval << " ms.");
-
 		noAudioThread = SDL_CreateThread(AudioFallbackThread, (void*)this);
 		noAudioMutex = SDL_CreateMutex();
 
