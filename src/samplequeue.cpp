@@ -26,9 +26,7 @@
 
 void SampleQueue::clear()
 {
-	SDL_LockAudio();
 	while(!empty()){
 		pop();
 	}
-	SDL_UnlockAudio();
 }

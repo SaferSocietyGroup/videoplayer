@@ -36,6 +36,7 @@
 
 class Player : public IAudioDevice
 {
+	friend int AudioFallbackThread(void* data);
 	SampleQueue samples;
 	Sample lastSample;
 	double audioFrameFrequency = 0;
@@ -46,14 +47,6 @@ class Player : public IAudioDevice
 	void SetDims(int nw, int nh, int vw, int vh);
 	static int MessageHandlerThread(void* instance);
 	
-	// IAudioDevice
-	void emptyQueue();
-	int getBlockSize();
-	int getSampleCount();
-	int getSampleRate();
-	int getChannelCount();
-	void EnqueueSamples(const Sample* buffer, int size);
-
 	bool initialized;
 	int w, h;
 	IPC* ipc;
@@ -69,9 +62,20 @@ class Player : public IAudioDevice
 	std::queue<std::pair<std::string, std::string>> messageQueue;
 	LfscppPtr lfsc = 0;
 
-	SDL_TimerID noAudioTimer;
+	SDL_Thread* noAudioThread;
+	SDL_mutex* noAudioMutex;
 
 	public:
+	// IAudioDevice
+	void emptyQueue();
+	int getBlockSize();
+	int getSampleCount();
+	int getSampleRate();
+	int getChannelCount();
+	void EnqueueSamples(const Sample* buffer, int size);
+	void LockAudio();
+	void UnlockAudio();
+
 	VideoPtr video;
 	int freq;
 
