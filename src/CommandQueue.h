@@ -21,8 +21,16 @@ enum CommandType
 	CTSeek =   4,
 	CTLoad =   5,
 	CTUnload = 6,
+	CTLfsConnect = 7,
+	CTLfsDisconnect = 8,
 
 	CTCmdCount
+};
+
+enum LoadType
+{
+	LTFile,
+	LTLfs
 };
 
 enum ArgumentType
@@ -31,7 +39,7 @@ enum ArgumentType
 };
 
 // number of arguments for the different commands
-const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATStr}, {}};
+const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATInt32, ATStr}, {}, {ATStr}, {}};
 
 struct Argument
 {
