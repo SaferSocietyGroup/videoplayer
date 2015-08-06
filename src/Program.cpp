@@ -14,12 +14,14 @@
 #include "Video.h"
 #include "FileStream.h"
 #include "SdlAudioDevice.h"
+#include "Lfscpp.h"
 
 class CProgram : public Program
 {
 	public:
 	std::string pipeName;
 	std::string sWindowId;
+	LfscppPtr lfs;
 	
 	VideoPtr video;
 
@@ -61,10 +63,21 @@ class CProgram : public Program
 				break;
 
 			case CTLoad: {
-					FileStreamPtr fs = FileStream::Create();
-					fs->Open(Tools::WstrToStr(cmd.args[0].str), false);
+					StreamPtr s;
 
-					video = Video::Create(fs, handleError, audio, 64);
+					if((LoadType)cmd.args[0].i == LTFile){
+						// open a file directly
+						FileStreamPtr fs = FileStream::Create();
+						fs->Open(Tools::WstrToStr(cmd.args[1].str), false);
+						s = fs;
+					}
+
+					else{
+						// open an lfs stream
+						s = lfs->Open(cmd.args[1].str);
+					}
+
+					video = Video::Create(s, handleError, audio, 64);
 
 					if(overlay)
 						SDL_FreeYUVOverlay(overlay);
@@ -76,6 +89,14 @@ class CProgram : public Program
 			case CTUnload:
 				video = 0;
 				audio->SetPaused(true);
+				break;
+
+			case CTLfsConnect:
+				lfs->Connect(cmd.args[0].str, 1000);
+				break;
+			
+			case CTLfsDisconnect:
+				lfs->Disconnect();
 				break;
 
 			default:
@@ -103,6 +124,8 @@ class CProgram : public Program
 				
 		handleError = [&](Video::Error e, const std::string& msg){
 		};
+
+		lfs = Lfscpp::Create();
 
 		while(!done){
 			uint32_t timer = SDL_GetTicks();
@@ -203,6 +226,10 @@ class CProgram : public Program
 		{
 			FlogF(ex.what());
 			return 1;
+		}
+
+		if(lfs != 0){
+			lfs->Disconnect();
 		}
 
 		SDL_Quit();

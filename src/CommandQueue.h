@@ -14,15 +14,23 @@ class CommandQueueException : public std::runtime_error {
 
 enum CommandType
 {
-	CTQuit =   0,
-	CTPlay =   1,
-	CTPause =  2, 
-	CTStop =   3,
-	CTSeek =   4,
-	CTLoad =   5,
-	CTUnload = 6,
+	CTQuit =          0,
+	CTPlay =          1,
+	CTPause =         2, 
+	CTStop =          3,
+	CTSeek =          4,
+	CTLoad =          5,
+	CTUnload =        6,
+	CTLfsConnect =    7,
+	CTLfsDisconnect = 8,
 
 	CTCmdCount
+};
+
+enum LoadType
+{
+	LTFile,
+	LTLfs
 };
 
 enum ArgumentType
@@ -30,8 +38,8 @@ enum ArgumentType
 	ATStr, ATInt32, ATFloat, ATDouble
 };
 
-// number of arguments for the different commands
-const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATStr}, {}};
+// argument type specification for the different commands
+const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATInt32, ATStr}, {}, {ATStr}, {}};
 
 struct Argument
 {
