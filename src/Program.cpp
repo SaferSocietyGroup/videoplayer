@@ -228,6 +228,10 @@ class CProgram : public Program
 			return 1;
 		}
 
+		if(lfs != 0){
+			lfs->Disconnect();
+		}
+
 		SDL_Quit();
 
 		return 0;
