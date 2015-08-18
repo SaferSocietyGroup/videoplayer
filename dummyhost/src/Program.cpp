@@ -18,6 +18,7 @@
 #include "ArgParser.h"
 #include "Flog.h"
 #include "CommandQueue.h"
+#include "CommandSender.h"
 #include "StringTools.h"
 #include "Pipe.h"
 
@@ -27,13 +28,38 @@ class CommandLine
 {
 	public:
 	std::shared_ptr<std::thread> thread;
+	std::shared_ptr<std::thread> recvThread;
 	bool done = false;
 
-	PipePtr pipe;
+	CommandSenderPtr cmdSend;
+	CommandQueuePtr cmdRecv;
 
-	void Init(PipePtr pipe)
+	void RecvThread()
 	{
-		this->pipe = pipe;
+		while(!done){
+			Command cmd;
+			if(cmdRecv->Dequeue(cmd)){
+				if(cmd.type == CTPositionUpdate){
+					FlogD("position update: " << cmd.args[0].f);
+				}else if(cmd.type == CTDuration){
+					FlogD("duration: " << cmd.args[0].f);
+				}else{
+					FlogD("unknown command from player");
+				}
+			}
+
+			else{
+				SDL_Delay(100);
+			}
+		}
+	}
+
+	void Init(CommandSenderPtr cmdSend, CommandQueuePtr cmdRecv)
+	{
+		this->cmdSend = cmdSend;
+		this->cmdRecv = cmdRecv;
+
+		recvThread = std::make_shared<std::thread>([&](){ RecvThread(); });
 
 		thread = std::make_shared<std::thread>([&](){
 			std::string line;
@@ -45,7 +71,8 @@ class CommandLine
 				{"stop", CTStop},
 				{"seek", CTSeek},
 				{"load", CTLoad},
-				{"unload", CTUnload}
+				{"unload", CTUnload},
+				{"update-output-size", CTUpdateOutputSize},
 			};
 
 			while(!done){
@@ -54,39 +81,43 @@ class CommandLine
 				std::cout << line << std::endl;
 				
 				try {
-					StrVec cmds = StringTools::Split(line, ' ', 1);
+					StrVec cmds = StringTools::Split(line, ' ');
 
 					if(cmds.size() == 0)
 						throw std::runtime_error("expected command");
-
+					
 					auto it = cmdStrs.find(cmds[0]);
 					if(it == cmdStrs.end())
 						throw std::runtime_error(Str("no such command: " << cmds[0]));
 					
-					CommandType cmd = it->second;
+					Command cmd;
+					cmd.type = it->second;
 					
-					if(cmds.size() - 1 != CommandArgs[cmd].size())
-						throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd].size() << " args (not " << cmds.size() - 1 << ")"));
+					if(cmds.size() - 1 != CommandArgs[cmd.type].size())
+						throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd.type].size() << " args (not " << cmds.size() - 1 << ")"));
 
-					if(cmd == CTQuit)
+					if(cmd.type == CTQuit)
 						done = true;
 
-					pipe->WriteUInt32(MAGIC);
-					pipe->WriteUInt32((uint32_t)cmd);
-
 					int i = 1;
-					for(ArgumentType aType : CommandArgs[cmd]){
+
+					for(ArgumentType aType : CommandArgs[cmd.type]){
+						Argument arg;
+						arg.type = aType;
+
 						switch(aType){
-							case ATStr:    pipe->WriteString(Tools::StrToWstr(cmds[i]));  break;
-							case ATInt32:  pipe->WriteInt32(atoi(cmds[i].c_str()));  break;
-							case ATFloat:  pipe->WriteFloat(atof(cmds[i].c_str()));  break;
-							case ATDouble: pipe->WriteDouble(atof(cmds[i].c_str())); break;
+							case ATStr:    arg.str = Tools::StrToWstr(cmds[i]);  break;
+							case ATInt32:  arg.i = atoi(cmds[i].c_str());        break;
+							case ATFloat:  arg.f = atof(cmds[i].c_str());        break;
+							case ATDouble: arg.d = atof(cmds[i].c_str());        break;
 						}
+
+						cmd.args.push_back(arg);
 
 						i++;
 					}
-					
-					pipe->WriteUInt32(MAGIC);
+
+					cmdSend->SendCommand(cmd);
 				}
 
 				catch (std::runtime_error e)
@@ -101,8 +132,7 @@ class CommandLine
 class CProgram : public Program
 {
 	public:
-	std::string pipeName;
-	std::string sWindowId;
+	std::wstring pipeName = L"videotest";
 
 	SDL_Surface* window;
 	
@@ -113,15 +143,30 @@ class CProgram : public Program
 
 		SDL_SysWMinfo info;
 		SDL_GetWMInfo(&info);
-		std::cout << (intptr_t)info.window << std::endl;
+		std::cout << "window id: " << (intptr_t)info.window << std::endl;
 
 		SDL_Event event;
 
 		CommandLine cli;
 
-		PipePtr pipe = Pipe::Create();
-		pipe->CreatePipe(L"videotest");
-		cli.Init(pipe);
+		PipePtr sendPipe = Pipe::Create();
+		sendPipe->CreatePipe(pipeName);
+		
+		PipePtr recvPipe = Pipe::Create();
+		recvPipe->CreatePipe(LStr(pipeName << L"_r"));
+		
+		FlogD("waiting for connection");
+		sendPipe->WaitForConnection(-1);
+		recvPipe->WaitForConnection(-1);
+		FlogD("connected");
+		
+		CommandSenderPtr cmdSend = CommandSender::Create();
+		cmdSend->Start(sendPipe);
+		
+		CommandQueuePtr cmdRecv = CommandQueue::Create();
+		cmdRecv->Start(recvPipe);
+		
+		cli.Init(cmdSend, cmdRecv);
 
 		SDL_FillRect(window, 0, 0x3366aa);
 		SDL_Flip(window);
@@ -136,6 +181,9 @@ class CProgram : public Program
 		}
 		
 		cli.thread->join();
+		cli.recvThread->join();
+
+		cmdSend->Stop();
 	}
 
 	int Run(int argc, char** argv)

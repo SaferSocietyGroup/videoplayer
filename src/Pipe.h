@@ -38,6 +38,8 @@ class Pipe
 	virtual void WriteString(const std::wstring& str) = 0;
 	virtual void ReadString(std::wstring& str) = 0;
 
+	virtual void WaitForConnection(int msTimeout) = 0;
+
 	static PipePtr Create();
 };
 
