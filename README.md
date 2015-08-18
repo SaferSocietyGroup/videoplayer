@@ -1,8 +1,8 @@
-# NetClean Video Player
+# SSG Video Player
   Multi process video player for windows.
 
 ## License
-  NetClean Video Player is released under the GPL version 2 license. See LICENSE for more information.
+  SSG Video Player is released under the GPL version 2 license. See LICENSE for more information.
 
 ## Requirements
   * ffmpeg 2.1

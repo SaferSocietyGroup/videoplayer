@@ -1,6 +1,6 @@
 [-common]
 target_platform	 mingw32
-name             NetCleanVideoPlayer
+name             SSG.VideoPlayer
 
 template         c++11
 cflags           ggdb
