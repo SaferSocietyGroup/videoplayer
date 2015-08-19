@@ -12,10 +12,11 @@ class CPipe : public Pipe
 {
 	public:
 	HANDLE pipe = INVALID_HANDLE_VALUE;
+	std::wstring nameFix;
 
 	void Open(const std::wstring& name, int msTimeout)
 	{
-		std::wstring nameFix = LStr(L"\\\\.\\pipe\\" << name);
+		nameFix = LStr(L"\\\\.\\pipe\\" << name);
 
 		if(!WaitNamedPipeW(nameFix.c_str(), msTimeout))
 			throw PipeException(Str("could not wait for pipe, error code: " << GetLastError()));
@@ -29,12 +30,24 @@ class CPipe : public Pipe
 
 	void CreatePipe(const std::wstring& name)
 	{
-		pipe = CreateNamedPipeW(LStr(L"\\\\.\\pipe\\" << name).c_str(), PIPE_ACCESS_DUPLEX, 
+		nameFix = LStr(L"\\\\.\\pipe\\" << name);
+
+		pipe = CreateNamedPipeW(nameFix.c_str(), PIPE_ACCESS_DUPLEX, 
 			PIPE_TYPE_MESSAGE | PIPE_READMODE_MESSAGE | PIPE_WAIT,
 			1, 32, 32, 100, NULL);
 
 		if(pipe == INVALID_HANDLE_VALUE)
 			throw PipeException(Str("could not create pipe, error code: " << GetLastError()));
+	}
+
+	void WaitForConnection(int msTimeout)
+	{
+		if(!ConnectNamedPipe(pipe, NULL)){
+			DWORD ec = GetLastError();
+			if(ec != ERROR_PIPE_CONNECTED){
+				throw PipeException(Str("could not wait for connection, error code: " << ec));
+			}
+		}
 	}
 
 	// makes sure a buffer pointing to an int of arbitrary size is little endian

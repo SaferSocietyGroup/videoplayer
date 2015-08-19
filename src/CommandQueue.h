@@ -5,6 +5,10 @@
 #include <string>
 #include <vector>
 
+#include "Pipe.h"
+
+#define MAGIC 0xaabbaacc
+
 typedef std::shared_ptr<class CommandQueue> CommandQueuePtr;
 
 class CommandQueueException : public std::runtime_error {
@@ -14,15 +18,18 @@ class CommandQueueException : public std::runtime_error {
 
 enum CommandType
 {
-	CTQuit =          0,
-	CTPlay =          1,
-	CTPause =         2, 
-	CTStop =          3,
-	CTSeek =          4,
-	CTLoad =          5,
-	CTUnload =        6,
-	CTLfsConnect =    7,
-	CTLfsDisconnect = 8,
+	CTQuit =             0,
+	CTPlay =             1,
+	CTPause =            2, 
+	CTStop =             3,
+	CTSeek =             4,
+	CTLoad =             5,
+	CTUnload =           6,
+	CTLfsConnect =       7,
+	CTLfsDisconnect =    8,
+	CTUpdateOutputSize = 9,
+	CTPositionUpdate =  10,
+	CTDuration       =  11,
 
 	CTCmdCount
 };
@@ -39,7 +46,7 @@ enum ArgumentType
 };
 
 // argument type specification for the different commands
-const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATInt32, ATStr}, {}, {ATStr}, {}};
+const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATInt32, ATStr}, {}, {ATStr}, {}, {ATInt32, ATInt32}, {ATFloat}, {ATFloat}};
 
 struct Argument
 {
@@ -60,8 +67,9 @@ struct Command
 class CommandQueue
 {
 	public:
-	virtual void Start(const std::wstring& pipeName) = 0;
+	virtual void Start(PipePtr pipe) = 0;
 	virtual bool Dequeue(Command& cmd) = 0;
+	virtual void WaitForConnection(int msTimeout) = 0;
 
 	static CommandQueuePtr Create();
 };

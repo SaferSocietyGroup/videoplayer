@@ -10,6 +10,7 @@
 #include "ArgParser.h"
 #include "Flog.h"
 #include "CommandQueue.h"
+#include "CommandSender.h"
 #include "Tools.h"
 #include "Video.h"
 #include "FileStream.h"
@@ -32,10 +33,26 @@ class CProgram : public Program
 
 	SDL_Rect rect = {0, 0, 640, 480};
 
+	CommandSenderPtr cmdSend;
 	CommandQueuePtr qCmd;
 	SDL_Surface* window;
 
 	Video::ErrorCallback handleError;
+
+	void UpdateOutputSize(int w, int h)
+	{
+		if(w > window->w || h > window->h){
+			SDL_FreeSurface(window);
+			window = SDL_SetVideoMode(w, h, 0, 0);
+			FlogD("setting new window size: " << w << " x " << h);
+
+			if(!window)
+				throw std::runtime_error("could not set new window size");
+		}
+		
+		rect.w = w;
+		rect.h = h;
+	}
 
 	void HandleCommand(Command cmd)
 	{
@@ -79,10 +96,21 @@ class CProgram : public Program
 
 					video = Video::Create(s, handleError, audio, 64);
 
+					if(video != 0){
+						FlogExpD(video->getReportedDurationInSecs());
+						cmdSend->SendCommand(CTDuration, video->getReportedDurationInSecs());
+					}
+						
+
 					if(overlay)
 						SDL_FreeYUVOverlay(overlay);
 
-		 			overlay = SDL_CreateYUVOverlay(640, 480, SDL_YUY2_OVERLAY, window);
+					FlogD("creating new overlay: " << video->getWidth() << " x " << video->getHeight());
+
+		 			overlay = SDL_CreateYUVOverlay(video->getWidth(), video->getHeight(), SDL_YUY2_OVERLAY, window);
+
+					if(!overlay)
+						throw std::runtime_error("could not create overlay for video");
 				}
 				break;
 
@@ -97,6 +125,10 @@ class CProgram : public Program
 			
 			case CTLfsDisconnect:
 				lfs->Disconnect();
+				break;
+
+			case CTUpdateOutputSize:
+				UpdateOutputSize(cmd.args[0].i, cmd.args[1].i);
 				break;
 
 			default:
@@ -154,6 +186,8 @@ class CProgram : public Program
 					video->updateOverlay(overlay->pixels, overlay->pitches, overlay->w, overlay->h);
 					SDL_UnlockYUVOverlay(overlay);
 					SDL_DisplayYUVOverlay(overlay, &rect);
+
+					cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
 				}
 			}
 
@@ -210,11 +244,24 @@ class CProgram : public Program
 			char buffer[512];
 			sprintf(buffer, "SDL_WINDOWID=%i", (intptr_t)hwnd); 
 			SDL_putenv(buffer); 
+		
+			PipePtr cqPipe = Pipe::Create();
+			cqPipe->Open(Tools::StrToWstr(pipeName));
+
+			PipePtr csPipe = Pipe::Create();
+			csPipe->Open(LStr(Tools::StrToWstr(pipeName) << "_r"));
+
+			SDL_Delay(10000);
 
 			qCmd = CommandQueue::Create();
-			qCmd->Start(Tools::StrToWstr(pipeName));
+			qCmd->Start(cqPipe);
+
+			cmdSend = CommandSender::Create();
+			cmdSend->Start(csPipe);
 
 			Interface();
+
+			cmdSend->Stop();
 		}
 
 		catch (std::runtime_error ex){
