@@ -1,14 +1,14 @@
 <?xml version="1.0"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
   <metadata>
-    <id>NetCleanVideoPlayerSubProcess</id>
-    <version>1.0.1.0</version>
+    <id>SSG.VideoPlayerSubProcess</id>
+    <version>2.0.0.0</version>
     <authors>Fredrik Hultin</authors>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <description>NetClean VideoPlayer SubProcess</description>
+    <description>SSG VideoPlayer SubProcess</description>
   </metadata>
   <files>
-    <file src="NetCleanVideoPlayer.exe" target="CopyToOutput/always" />
+    <file src="SSG.VideoPlayer.exe" target="CopyToOutput/always" />
     <file src="dummy.txt" target="lib" />
   </files>
 </package>
