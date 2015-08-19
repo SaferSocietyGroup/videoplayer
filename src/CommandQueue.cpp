@@ -8,8 +8,6 @@
 #include "Tools.h"
 #include "Flog.h"
 
-#define MAGIC 0xaabbaacc
-
 #include "windows.h"
 
 class CCommandQueue : public CommandQueue
@@ -28,15 +26,18 @@ class CCommandQueue : public CommandQueue
 	bool done = false;
 	std::thread* thread = nullptr;
 	std::mutex mutex;
+	
+	void WaitForConnection(int msTimeout)
+	{
+		pipe->WaitForConnection(msTimeout);
+	}
 
-	void Start(const std::wstring& pipeName)
+	void Start(PipePtr pipe)
 	{
 		if(thread != nullptr)
 			throw CommandQueueException("command queue double start");
 
-		pipe = Pipe::Create();
-
-		pipe->Open(pipeName);
+		this->pipe = pipe;
 
 		thread = new std::thread([&](){
 			try {
@@ -76,8 +77,9 @@ class CCommandQueue : public CommandQueue
 					queue.push(cmd);
 					mutex.unlock();
 					
-					if(cmd.type == CTQuit)
+					if(cmd.type == CTQuit){
 						done = true;
+					}
 				}
 			}
 

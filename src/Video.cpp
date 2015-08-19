@@ -39,6 +39,7 @@
 #include "Flog.h"
 #include "AudioHandler.h"
 #include "TimeHandler.h"
+#include "PriorityQueue.h"
 
 struct Frame
 {
@@ -87,7 +88,7 @@ class CVideo : public Video
 
 	Error lastError;
 
-	std::priority_queue<Frame, std::vector<Frame>, Frame> frameQueue;
+	PriorityQueue<Frame> frameQueue;
 	
 	double lastPts;
 	int64_t lastDts;
@@ -376,7 +377,12 @@ class CVideo : public Video
 	}
 
 	double getPosition(){
-		return lastPts - timeFromPts(firstPts);
+		double pts = 0;
+
+		if(frameQueue.GetContainer().size() > 0)
+			pts = frameQueue.GetContainer()[0].pts;
+
+		return pts - timeFromPts(firstPts);
 	}
 
 	void freePacket(){

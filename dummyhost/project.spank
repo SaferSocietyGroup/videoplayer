@@ -1,7 +1,7 @@
 name              dummyhost
 template          c++11
 target_platform   mingw32
-cflags            I../src std=c++11 Wall
+cflags            I../src std=c++11 Wall ggdb
 sourcedir         ../src src
 #exclude           ../src/main.cpp
 exclude           ../src/Program.cpp

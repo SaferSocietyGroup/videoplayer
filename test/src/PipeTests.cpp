@@ -25,6 +25,7 @@ class CPipeTests : public PipeTests
 		testSet.push_back({"Pipe", "EncodeDecodeLEB128", [&]{EncodeDecodeLEB128();} });
 		testSet.push_back({"Pipe", "ReadWriteLEB128", [&]{ReadWriteLEB128();} });
 		testSet.push_back({"Pipe", "ReadWriteString", [&]{ReadWriteString();} });
+		testSet.push_back({"Pipe", "ReadBeforeWrite", [&]{ReadBeforeWrite();} });
 	}
 
 	void Create()
@@ -220,6 +221,28 @@ class CPipeTests : public PipeTests
 			uint64_t r = client->ReadLEB128();
 			TAssertEquals(v, r);
 		}
+	}
+	
+	void ReadBeforeWrite()
+	{
+		PipePtr host, client;
+
+		host = Pipe::Create(); 
+		host->CreatePipe(L"hello");
+
+		client = Pipe::Create();
+		client->Open(L"hello");
+		
+		std::thread wt([&]{
+			std::this_thread::sleep_for(std::chrono::milliseconds(300));
+			host->WriteInt32(32);
+		});
+
+		int r = client->ReadInt32();
+
+		TAssertEquals(32, r);
+
+		wt.join();
 	}
 	
 	void ReadWriteString()
