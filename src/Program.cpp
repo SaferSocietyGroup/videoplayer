@@ -251,8 +251,6 @@ class CProgram : public Program
 			PipePtr csPipe = Pipe::Create();
 			csPipe->Open(LStr(Tools::StrToWstr(pipeName) << "_r"));
 
-			SDL_Delay(10000);
-
 			qCmd = CommandQueue::Create();
 			qCmd->Start(cqPipe);
 
