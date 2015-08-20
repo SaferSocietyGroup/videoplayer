@@ -22,5 +22,5 @@ cflags           O0
 ldflags          mconsole 
 
 [release: common]
-cflags           O3
+cflags           O0
 postbuildscript  "$(host_dash)strip $(target)"
