@@ -5,6 +5,8 @@
 #include <string>
 #include <thread>
 
+#include <SDL.h>
+
 #include "CommandQueueTests.h"
 #include "CommandQueue.h"
 #include "Flog.h"
@@ -49,38 +51,49 @@ class CCommandQueueTests : public CommandQueueTests
 		cPipe->Open(L"cmd2");
 
 		cq->Start(cPipe);
+
+		bool wasException = false;
+		std::string ex;
 		
 		std::thread t([&](){
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTPlay);
-			pipe->WriteUInt32(MAGIC);
-			
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTPause);
-			pipe->WriteUInt32(MAGIC);
-			
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTStop);
-			pipe->WriteUInt32(MAGIC);
-			
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTSeek);
-			pipe->WriteFloat(0.34f);
-			pipe->WriteUInt32(MAGIC);
+			try {
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTPlay);
+				pipe->WriteUInt32(MAGIC);
+				
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTPause);
+				pipe->WriteUInt32(MAGIC);
+				
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTStop);
+				pipe->WriteUInt32(MAGIC);
+				
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTSeek);
+				pipe->WriteFloat(0.34f);
+				pipe->WriteUInt32(MAGIC);
 
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTLoad);
-			pipe->WriteInt32(0);
-			pipe->WriteString(L"name");
-			pipe->WriteUInt32(MAGIC);
-			
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTUnload);
-			pipe->WriteUInt32(MAGIC);
-			
-			pipe->WriteUInt32(MAGIC);
-			pipe->WriteUInt32(CTQuit);
-			pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTLoad);
+				pipe->WriteInt32(0);
+				pipe->WriteString(L"name");
+				pipe->WriteUInt32(MAGIC);
+				
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTUnload);
+				pipe->WriteUInt32(MAGIC);
+				
+				pipe->WriteUInt32(MAGIC);
+				pipe->WriteUInt32(CTQuit);
+				pipe->WriteUInt32(MAGIC);
+			}
+
+			catch (std::runtime_error e)
+			{
+				wasException = true;
+				ex = e.what();
+			}
 		});
 
 		int nCmd = 1;
@@ -113,6 +126,9 @@ class CCommandQueueTests : public CommandQueueTests
 					
 					nCmd++;
 				}
+				else{
+					SDL_Delay(1);
+				}
 
 				if(tries++ > 10000)
 					throw std::runtime_error("too many tries");
@@ -126,6 +142,9 @@ class CCommandQueueTests : public CommandQueueTests
 		}
 
 		t.join();
+
+		if(wasException)
+			throw std::runtime_error(ex);
 	}
 };
 

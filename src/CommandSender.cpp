@@ -13,7 +13,7 @@ class CCommandSender : public CommandSender
 	public:
 	PipePtr pipe;
 
-	std::string pipeEx;
+	std::string ex;
 	bool wasException = false;
 
 	std::queue<Command> queue;
@@ -28,12 +28,12 @@ class CCommandSender : public CommandSender
 			thread->join();
 	}
 
-	void Start(PipePtr pipe)
+	void Start(PipePtr inPipe)
 	{
 		if(thread != nullptr)
 			throw CommandQueueException("command sender double start");
 
-		this->pipe = pipe;
+		this->pipe = inPipe;
 
 		thread = new std::thread([&](){
 			try {
@@ -77,9 +77,9 @@ class CCommandSender : public CommandSender
 				}
 			}
 
-			catch (PipeException e)
+			catch (std::runtime_error e)
 			{
-				pipeEx = e.what();
+				ex = e.what();
 				wasException = true;
 			}
 		});
@@ -125,7 +125,7 @@ class CCommandSender : public CommandSender
 	void SendCommand(Command& cmd)
 	{
 		if(wasException)
-			throw CommandSenderException(Str("pipe threw exception: " << pipeEx));
+			throw CommandSenderException(Str("pipe threw exception: " << ex));
 
 		if(cmd.args.size() != CommandArgs[cmd.type].size())
 			throw CommandSenderException(Str("Command expects " << CommandArgs[cmd.type].size() << " args (not " << cmd.args.size()<< ")"));

@@ -160,7 +160,7 @@ class CProgram : public Program
 	{
 		SDL_Init(SDL_INIT_EVERYTHING);
 
-		window = SDL_SetVideoMode(640, 480, 0, 0);
+		window = SDL_SetVideoMode(1024, 768, 0, SDL_RESIZABLE);
 		FlogAssert(window, "could not set video mode");
 
 		SDL_SysWMinfo info;
@@ -198,6 +198,16 @@ class CProgram : public Program
 			while(SDL_PollEvent(&event)){
 				if(event.type == SDL_QUIT || (event.type == SDL_KEYDOWN && event.key.keysym.sym == SDLK_ESCAPE))
 					cli.done = true;
+
+				if(event.type == SDL_VIDEORESIZE){
+					if(window)
+						SDL_FreeSurface(window);
+
+					window = SDL_SetVideoMode(event.resize.w, event.resize.h, 0, SDL_RESIZABLE);
+					SDL_FillRect(window, 0, 0x3366aa);
+					SDL_Flip(window);
+					cmdSend->SendCommand(CTUpdateOutputSize, event.resize.w, event.resize.h);
+				}
 			}
 
 			SDL_Delay(16);
