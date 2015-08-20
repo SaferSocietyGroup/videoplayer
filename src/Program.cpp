@@ -1,5 +1,6 @@
 #include <iostream>
 #include <cstdint>
+#include <cstdio>
 
 #include <SDL.h>
 
@@ -32,6 +33,7 @@ class CProgram : public Program
 	SDL_Overlay* overlay = 0;
 
 	SDL_Rect rect = {0, 0, 640, 480};
+	int w = 640, h = 480;
 
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr qCmd;
@@ -41,6 +43,9 @@ class CProgram : public Program
 
 	void UpdateOutputSize(int w, int h)
 	{
+		this->w = w;
+		this->h = h;
+
 		if(w > window->w || h > window->h){
 			SDL_FreeSurface(window);
 			window = SDL_SetVideoMode(w, h, 0, 0);
@@ -49,9 +54,24 @@ class CProgram : public Program
 			if(!window)
 				throw std::runtime_error("could not set new window size");
 		}
-		
-		rect.w = w;
-		rect.h = h;
+
+		if(!overlay)
+			return;
+
+		float wAspect = (float)w / (float)h;
+		float aspect = (float)overlay->w / (float)overlay->h;
+
+		if(wAspect >= aspect){
+			rect.w = h * aspect; 
+			rect.h = h;
+			rect.x = (w - rect.w) / 2;
+			rect.y = 0;
+		}else{
+			rect.w = w;
+			rect.h = w / aspect;
+			rect.x = 0;
+			rect.y = (h - rect.h) / 2;
+		}
 	}
 
 	void HandleCommand(Command cmd)
@@ -111,6 +131,8 @@ class CProgram : public Program
 
 					if(!overlay)
 						throw std::runtime_error("could not create overlay for video");
+
+					UpdateOutputSize(w, h);
 				}
 				break;
 
@@ -141,7 +163,7 @@ class CProgram : public Program
 	{
 		SDL_Init(SDL_INIT_EVERYTHING);
 
-		window = SDL_SetVideoMode(640, 480, 0, 0);
+		window = SDL_SetVideoMode(w, h, 0, 0);
 		FlogAssert(window, "could not set video mode");
 
 		audio = SdlAudioDevice::Create();

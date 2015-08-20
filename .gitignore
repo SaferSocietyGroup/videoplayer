@@ -4,3 +4,8 @@
 *.flv
 *.mp4
 *.so
+*.log
+*.mpg
+*.mpeg
+*.wmv
+*.debug

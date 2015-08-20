@@ -24,6 +24,8 @@
 #include "Flog.h"
 #include <stdarg.h>
 
+static FILE* flogFile = stdout;
+
 int Flog_SeverityToIndex(Flog_Severity severity)
 {
 	for(int i = 0; i < 8; i++){
@@ -41,6 +43,11 @@ const char* Flog_SeverityToString(Flog_Severity severity)
 	return severityString[Flog_SeverityToIndex(severity)];
 }
 
+void Flog_SetTargetFile(FILE* file)
+{
+	flogFile = file;
+}
+
 void Flog_Log(const char* file, uint32_t lineNumber, Flog_Severity severity, const char* format, ...)
 {
 	va_list fmtargs;
@@ -52,6 +59,6 @@ void Flog_Log(const char* file, uint32_t lineNumber, Flog_Severity severity, con
 	vsnprintf(buffer, sizeof(buffer) - 1, format, fmtargs);
 	va_end(fmtargs);
 	
-	printf("[%s] %s:%d %s\r\n", Flog_SeverityToString(severity), file, lineNumber, buffer);
+	fprintf(flogFile, "[%s] %s:%d %s\r\n", Flog_SeverityToString(severity), file, lineNumber, buffer);
 	fflush(stdout);
 }

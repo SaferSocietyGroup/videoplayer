@@ -19,7 +19,7 @@ class CCommandQueue : public CommandQueue
 	};
 
 	PipePtr pipe;
-	std::string pipeEx;
+	std::string ex;
 	bool wasException = false;
 
 	std::queue<Command> queue;
@@ -32,12 +32,12 @@ class CCommandQueue : public CommandQueue
 		pipe->WaitForConnection(msTimeout);
 	}
 
-	void Start(PipePtr pipe)
+	void Start(PipePtr inPipe)
 	{
 		if(thread != nullptr)
 			throw CommandQueueException("command queue double start");
 
-		this->pipe = pipe;
+		this->pipe = inPipe;
 
 		thread = new std::thread([&](){
 			try {
@@ -83,9 +83,9 @@ class CCommandQueue : public CommandQueue
 				}
 			}
 
-			catch (PipeException e)
+			catch (std::runtime_error e)
 			{
-				pipeEx = e.what();
+				ex = e.what();
 				wasException = true;
 			}
 		});
@@ -118,7 +118,7 @@ class CCommandQueue : public CommandQueue
 
 		else if(wasException)
 		{
-			throw CommandQueueException(Str("pipe threw exception: " << pipeEx));
+			throw CommandQueueException(Str("pipe threw exception: " << ex));
 		}
 
 		return false;
