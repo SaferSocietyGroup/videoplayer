@@ -95,14 +95,19 @@ class CAudioHandler : public AudioHandler
 	
 	int getAudioQueueSize()
 	{
-		return (int)queue.size();
+		device->Lock(true);
+		int size = (int)queue.size();
+		device->Lock(false);
+		return size;
 	}
 	
 	void clearQueue()
 	{
+		device->Lock(true);
 		while(!queue.empty()){
 			queue.pop();
 		}
+		device->Lock(false);
 	}
 
 	int fetchAudio(int16_t* data, int nSamples)

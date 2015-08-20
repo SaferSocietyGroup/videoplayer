@@ -30,6 +30,7 @@ class CommandLine
 	std::shared_ptr<std::thread> thread;
 	std::shared_ptr<std::thread> recvThread;
 	bool done = false;
+	bool showMessages = false;
 
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr cmdRecv;
@@ -39,12 +40,14 @@ class CommandLine
 		while(!done){
 			Command cmd;
 			if(cmdRecv->Dequeue(cmd)){
-				if(cmd.type == CTPositionUpdate){
-					FlogD("position update: " << cmd.args[0].f);
-				}else if(cmd.type == CTDuration){
-					FlogD("duration: " << cmd.args[0].f);
-				}else{
-					FlogD("unknown command from player");
+				if(showMessages){
+					if(cmd.type == CTPositionUpdate){
+						FlogD("position update: " << cmd.args[0].f);
+					}else if(cmd.type == CTDuration){
+						FlogD("duration: " << cmd.args[0].f);
+					}else{
+						FlogD("unknown command from player");
+					}
 				}
 			}
 
@@ -85,39 +88,56 @@ class CommandLine
 
 					if(cmds.size() == 0)
 						throw std::runtime_error("expected command");
-					
-					auto it = cmdStrs.find(cmds[0]);
-					if(it == cmdStrs.end())
-						throw std::runtime_error(Str("no such command: " << cmds[0]));
-					
-					Command cmd;
-					cmd.type = it->second;
-					
-					if(cmds.size() - 1 != CommandArgs[cmd.type].size())
-						throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd.type].size() << " args (not " << cmds.size() - 1 << ")"));
 
-					if(cmd.type == CTQuit)
-						done = true;
+					if(cmds[0] == "show-messages"){
+						if(cmds.size() != 2)
+							throw std::runtime_error("command expects true/false");
 
-					int i = 1;
-
-					for(ArgumentType aType : CommandArgs[cmd.type]){
-						Argument arg;
-						arg.type = aType;
-
-						switch(aType){
-							case ATStr:    arg.str = Tools::StrToWstr(cmds[i]);  break;
-							case ATInt32:  arg.i = atoi(cmds[i].c_str());        break;
-							case ATFloat:  arg.f = atof(cmds[i].c_str());        break;
-							case ATDouble: arg.d = atof(cmds[i].c_str());        break;
-						}
-
-						cmd.args.push_back(arg);
-
-						i++;
+						showMessages = cmds[1] == "true";
 					}
 
-					cmdSend->SendCommand(cmd);
+					if(cmds[0] == "seek-through"){
+						std::vector<float> positions = {1.0f, 3.0f, 10.0f, 20.0f, 23.0f, 23.5f, 30.0f, 70.0f};
+						for(auto pos : positions){
+							cmdSend->SendCommand(CTSeek, pos);
+							SDL_Delay(500);
+						}
+					}
+
+					else {
+						auto it = cmdStrs.find(cmds[0]);
+						if(it == cmdStrs.end())
+							throw std::runtime_error(Str("no such command: " << cmds[0]));
+						
+						Command cmd;
+						cmd.type = it->second;
+						
+						if(cmds.size() - 1 != CommandArgs[cmd.type].size())
+							throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd.type].size() << " args (not " << cmds.size() - 1 << ")"));
+
+						if(cmd.type == CTQuit)
+							done = true;
+
+						int i = 1;
+
+						for(ArgumentType aType : CommandArgs[cmd.type]){
+							Argument arg;
+							arg.type = aType;
+
+							switch(aType){
+								case ATStr:    arg.str = Tools::StrToWstr(cmds[i]);  break;
+								case ATInt32:  arg.i = atoi(cmds[i].c_str());        break;
+								case ATFloat:  arg.f = atof(cmds[i].c_str());        break;
+								case ATDouble: arg.d = atof(cmds[i].c_str());        break;
+							}
+
+							cmd.args.push_back(arg);
+
+							i++;
+						}
+
+						cmdSend->SendCommand(cmd);
+					}
 				}
 
 				catch (std::runtime_error e)
@@ -138,10 +158,13 @@ class CProgram : public Program
 	
 	void Interface()
 	{
+		SDL_Init(SDL_INIT_EVERYTHING);
+
 		window = SDL_SetVideoMode(640, 480, 0, 0);
 		FlogAssert(window, "could not set video mode");
 
 		SDL_SysWMinfo info;
+		SDL_VERSION(&info.version);
 		SDL_GetWMInfo(&info);
 		std::cout << "window id: " << (intptr_t)info.window << std::endl;
 
