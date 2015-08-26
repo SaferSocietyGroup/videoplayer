@@ -38,6 +38,7 @@
 #include "Video.h"
 #include "Flog.h"
 #include "AudioHandler.h"
+#include "AudioHandlerNoSound.h"
 #include "TimeHandler.h"
 #include "PriorityQueue.h"
 
@@ -316,10 +317,7 @@ class CVideo : public Video
 	}
 	
 	void play(){
-		if(IsEof())
-			errorCallback(EEof, "eof");
-		else
-			timeHandler->Play();
+		timeHandler->Play();
 	}
 
 	int getWidth(){
@@ -673,6 +671,7 @@ class CVideo : public Video
 		if(audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND){
 			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioDevice, timeHandler);
 		}else{
+			audioHandler = AudioHandlerNoSound::Create(audioDevice, timeHandler);
 			FlogD("no audio stream or unsupported audio codec");
 		}
 		
