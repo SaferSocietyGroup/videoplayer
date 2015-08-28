@@ -26,6 +26,9 @@
 #ifndef FLOG_H
 #define FLOG_H
 
+#include <functional>
+#include <string>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -112,3 +115,7 @@ void Flog_SetTargetFile(FILE* file);
 #endif
 
 #endif
+
+typedef std::function<void(Flog_Severity, int, const char*, const char*)> FlogCallback;
+
+void Flog_SetCallback(FlogCallback logCb);
