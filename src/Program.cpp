@@ -34,6 +34,8 @@ class CProgram : public Program
 
 	SDL_Rect rect = {0, 0, 640, 480};
 	int w = 640, h = 480;
+	
+	bool redraw = false;
 
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr qCmd;
@@ -54,6 +56,8 @@ class CProgram : public Program
 			if(!window)
 				throw std::runtime_error("could not set new window size");
 		}
+
+		redraw = true;
 
 		if(!overlay)
 			return;
@@ -153,6 +157,10 @@ class CProgram : public Program
 				UpdateOutputSize(cmd.args[0].i, cmd.args[1].i);
 				break;
 
+			case CTForceRedraw:
+				redraw = true;
+				break;
+
 			default:
 				throw std::runtime_error(Str("unknown command: " << (int)cmd.type));
 				break;
@@ -210,10 +218,15 @@ class CProgram : public Program
 					SDL_LockYUVOverlay(overlay);
 					video->updateOverlay(overlay->pixels, overlay->pitches, overlay->w, overlay->h);
 					SDL_UnlockYUVOverlay(overlay);
-					SDL_DisplayYUVOverlay(overlay, &rect);
+					redraw = true;
 
 					cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
 				}
+			}
+					
+			if(redraw && overlay){
+				SDL_DisplayYUVOverlay(overlay, &rect);
+				redraw = false;
 			}
 
 			timer = SDL_GetTicks() - timer;

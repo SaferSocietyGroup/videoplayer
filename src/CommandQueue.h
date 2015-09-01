@@ -32,6 +32,7 @@ enum CommandType
 	CTDuration       =  11,
 	CTEof            =  12,
 	CTLogMessage     =  13,
+	CTForceRedraw    =  14,
 
 	CTCmdCount
 };
@@ -63,6 +64,7 @@ const std::vector<std::vector<ArgumentType>> CommandArgs  = {
 	{ATFloat},                          // duration (seconds)
 	{},                                 // eof
 	{ATInt32, ATInt32, ATStr, ATStr},   // log message (verbosity, lineNumber, file, message)
+	{},                                 // force redraw
 };
 
 struct Argument
