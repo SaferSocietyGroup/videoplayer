@@ -45,6 +45,10 @@ class CommandLine
 						FlogD("position update: " << cmd.args[0].f);
 					}else if(cmd.type == CTDuration){
 						FlogD("duration: " << cmd.args[0].f);
+					}else if(cmd.type == CTEof){
+						FlogD("eof");
+					}else if(cmd.type == CTLogMessage){
+						FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
 					}else{
 						FlogD("unknown command from player");
 					}
@@ -96,7 +100,7 @@ class CommandLine
 						showMessages = cmds[1] == "true";
 					}
 
-					if(cmds[0] == "seek-through"){
+					else if(cmds[0] == "seek-through"){
 						std::vector<float> positions = {1.0f, 3.0f, 10.0f, 20.0f, 23.0f, 23.5f, 30.0f, 70.0f};
 						for(auto pos : positions){
 							cmdSend->SendCommand(CTSeek, pos);

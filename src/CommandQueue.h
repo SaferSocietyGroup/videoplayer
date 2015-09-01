@@ -30,6 +30,8 @@ enum CommandType
 	CTUpdateOutputSize = 9,
 	CTPositionUpdate =  10,
 	CTDuration       =  11,
+	CTEof            =  12,
+	CTLogMessage     =  13,
 
 	CTCmdCount
 };
@@ -46,7 +48,22 @@ enum ArgumentType
 };
 
 // argument type specification for the different commands
-const std::vector<std::vector<ArgumentType>> CommandArgs  = {{}, {}, {}, {}, {ATFloat}, {ATInt32, ATStr}, {}, {ATStr}, {}, {ATInt32, ATInt32}, {ATFloat}, {ATFloat}};
+const std::vector<std::vector<ArgumentType>> CommandArgs  = {
+	{},                                 // quit
+	{},                                 // play
+	{},                                 // pause
+	{},                                 // stop
+	{ATFloat},                          // seek (seconds)
+	{ATInt32, ATStr},                   // load (loadtype, path)
+	{},                                 // unload
+	{ATStr},                            // lfs connect (pipename)
+	{},                                 // lfs disconnect
+	{ATInt32, ATInt32},                 // update output size (w, h)
+	{ATFloat},                          // position update (seconds)
+	{ATFloat},                          // duration (seconds)
+	{},                                 // eof
+	{ATInt32, ATInt32, ATStr, ATStr},   // log message (verbosity, lineNumber, file, message)
+};
 
 struct Argument
 {

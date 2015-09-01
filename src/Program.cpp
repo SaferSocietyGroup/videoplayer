@@ -177,6 +177,9 @@ class CProgram : public Program
 		SDL_Event event;
 				
 		handleError = [&](Video::Error e, const std::string& msg){
+			if(e == Video::EEof){
+				cmdSend->SendCommand(CTEof);
+			}
 		};
 
 		lfs = Lfscpp::Create();
@@ -279,7 +282,15 @@ class CProgram : public Program
 			cmdSend = CommandSender::Create();
 			cmdSend->Start(csPipe);
 
+			Flog_SetCallback([&](Flog_Severity severity, int lineNumber, const char* file, const char* message){
+				std::wstring wmessage = Tools::StrToWstr(std::string(message));
+				std::wstring wfile = Tools::StrToWstr(std::string(file));
+				cmdSend->SendCommand(CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
+			});
+
 			Interface();
+
+			Flog_SetCallback(0);
 
 			cmdSend->Stop();
 		}
