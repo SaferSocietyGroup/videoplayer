@@ -80,6 +80,7 @@ class CommandLine
 				{"load", CTLoad},
 				{"unload", CTUnload},
 				{"update-output-size", CTUpdateOutputSize},
+				{"force-redraw", CTForceRedraw}
 			};
 
 			while(!done){
