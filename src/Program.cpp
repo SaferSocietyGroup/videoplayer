@@ -160,6 +160,11 @@ class CProgram : public Program
 			case CTForceRedraw:
 				redraw = true;
 				break;
+			
+			case CTSetPlaybackSpeed:
+				if(video)
+					video->setPlaybackSpeed(cmd.args[0].f);
+				break;
 
 			default:
 				throw std::runtime_error(Str("unknown command: " << (int)cmd.type));

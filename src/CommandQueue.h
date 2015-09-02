@@ -18,21 +18,22 @@ class CommandQueueException : public std::runtime_error {
 
 enum CommandType
 {
-	CTQuit =             0,
-	CTPlay =             1,
-	CTPause =            2, 
-	CTStop =             3,
-	CTSeek =             4,
-	CTLoad =             5,
-	CTUnload =           6,
-	CTLfsConnect =       7,
-	CTLfsDisconnect =    8,
+	CTQuit             = 0,
+	CTPlay             = 1,
+	CTPause            = 2, 
+	CTStop             = 3,
+	CTSeek             = 4,
+	CTLoad             = 5,
+	CTUnload           = 6,
+	CTLfsConnect       = 7,
+	CTLfsDisconnect    = 8,
 	CTUpdateOutputSize = 9,
-	CTPositionUpdate =  10,
-	CTDuration       =  11,
-	CTEof            =  12,
-	CTLogMessage     =  13,
-	CTForceRedraw    =  14,
+	CTPositionUpdate   = 10,
+	CTDuration         = 11,
+	CTEof              = 12,
+	CTLogMessage       = 13,
+	CTForceRedraw      = 14,
+	CTSetPlaybackSpeed = 15,
 
 	CTCmdCount
 };
@@ -65,6 +66,7 @@ const std::vector<std::vector<ArgumentType>> CommandArgs  = {
 	{},                                 // eof
 	{ATInt32, ATInt32, ATStr, ATStr},   // log message (verbosity, lineNumber, file, message)
 	{},                                 // force redraw
+	{ATFloat},                          // set playback speed (speed)
 };
 
 struct Argument
