@@ -150,6 +150,9 @@ class CommandLine
 				{
 					std::cerr << "error: " << e.what() << std::endl;
 				}
+
+				// wait for a bit to receieve any commands the player might still want to send
+				std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 			}
 		});
 	}
