@@ -132,8 +132,7 @@ class CVideo : public Video
 		emptyFrameQueue();
 
 		av_free(decFrame);
-		////freeFrame(decFrame);
-		freeFrame(&currentFrame.avFrame);
+		av_frame_free(&currentFrame.avFrame);
 
 		FlogD("end of destructor");
 	}
@@ -157,8 +156,8 @@ class CVideo : public Video
 		// and set the pFrame pointer to that.
 
 		while(!frameQueue.empty() && frameQueue.top().pts < time){
-			freeFrame(&newFrame.avFrame);
-
+			av_frame_free(&newFrame.avFrame);
+			
 			newFrame = frameQueue.top();
 			frameQueue.pop();
 		}
@@ -196,7 +195,7 @@ class CVideo : public Video
 
 		if(pts > time + 1.0 || pts < time - 1.0){
 			FlogD("adjusted time");
-			//timeHandler.setTime(pts);
+			timeHandler->SetTime(pts);
 		}
 	}
 	
@@ -215,7 +214,7 @@ class CVideo : public Video
 		if(newFrame.avFrame){
 			// Don't free currentFrame if it is currentFrame itself that's being converted
 			if(currentFrame.avFrame != newFrame.avFrame){
-				freeFrame(&currentFrame.avFrame);
+				av_frame_free(&currentFrame.avFrame);
 				currentFrame = newFrame; // Save the current frame for snapshots etc.
 			}
 		
@@ -250,7 +249,6 @@ class CVideo : public Video
 			FlogE("Failed to get a scaling context");
 		}
 	}
-
 
 	bool seek(double ts){
 		reachedEof = 0;
@@ -298,7 +296,8 @@ class CVideo : public Video
 		bool success = false;
 		while(!IsEof() && !success){
 			try {
-				while(frameQueue.size() < (unsigned int)frameQueueSize || (audioHandler->getAudioQueueSize() < audioDevice->GetBlockSize())){
+				while(frameQueue.size() < (unsigned int)frameQueueSize || 
+						(hasAudioStream() && audioHandler->getAudioQueueSize() < audioDevice->GetBlockSize())){
 					decodeFrame(true);
 				}
 
@@ -536,27 +535,23 @@ class CVideo : public Video
 	}
 
 	AVFrame* cloneFrame(AVFrame* src){
-		AVFrame* ret = avcodec_alloc_frame();
+		AVFrame* ret = av_frame_alloc();
+		uint8_t *buffer = (uint8_t *)av_malloc(avpicture_get_size((AVPixelFormat)src->format, src->width, src->height));
 
-		if(!ret){
+		if(!buffer || !ret){
+			if(ret)
+				av_frame_free(&ret);
+
+			if(buffer)
+				av_free(buffer);
+
 			throw std::runtime_error("allocation failed in cloneframe");
 		}
-		uint8_t *buffer = (uint8_t *)av_malloc(avpicture_get_size(pCodecCtx->pix_fmt, src->width, src->height) * 2);
-		/*uint8_t *buffer = (uint8_t *)av_malloc(avpicture_get_size(src->format, src->width, src->height));*/
 
 		avpicture_fill((AVPicture *) ret, buffer, pCodecCtx->pix_fmt, src->width, src->height);
 		av_picture_copy((AVPicture*)ret, (AVPicture*)decFrame, pCodecCtx->pix_fmt, src->width, src->height);
 		
-		//printf("%p vs. %p\n", buffer, ret->data[0]);
 		return ret;
-	}
-
-	void freeFrame(AVFrame** frame){
-		if(*frame){
-			av_free((*frame)->data[0]);
-			av_free(*frame);
-			*frame = 0;
-		}
 	}
 
 	// Raw byte seeking
@@ -603,11 +598,17 @@ class CVideo : public Video
 
 	void emptyFrameQueue(){
 		// Free buffered decoded frames
+		FlogExpD("emptying framequeue");
 		while(!frameQueue.empty()){
 			Frame topFrame = frameQueue.top();
 			frameQueue.pop();
-			freeFrame(&topFrame.avFrame);
+			av_frame_free(&topFrame.avFrame);
 		}
+	}
+
+	bool hasAudioStream()
+	{
+		return audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND;
 	}
 
 	bool openFile(StreamPtr stream, IAudioDevicePtr audioDevice){
@@ -668,7 +669,7 @@ class CVideo : public Video
 
 		audioStream = av_find_best_stream(pFormatCtx, AVMEDIA_TYPE_AUDIO, -1, -1, NULL, 0);
 
-		if(audioStream != AVERROR_STREAM_NOT_FOUND && audioStream != AVERROR_DECODER_NOT_FOUND){
+		if(hasAudioStream()){
 			audioHandler = AudioHandler::Create(pFormatCtx->streams[audioStream]->codec, audioDevice, timeHandler);
 		}else{
 			audioHandler = AudioHandlerNoSound::Create(audioDevice, timeHandler);
