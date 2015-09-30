@@ -166,6 +166,21 @@ class CProgram : public Program
 					video->setPlaybackSpeed(cmd.args[0].f);
 				break;
 
+			case CTSetVolume:
+				if(video)
+					video->SetVolume(cmd.args[0].f);
+				break;
+
+			case CTSetMute:
+				if(video)
+					video->SetMute(cmd.args[0].i != 0);
+				break;
+			
+			case CTSetQvMute:
+				if(video)
+					video->SetQvMute(cmd.args[0].i != 0);
+				break;
+
 			default:
 				throw std::runtime_error(Str("unknown command: " << (int)cmd.type));
 				break;

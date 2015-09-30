@@ -89,6 +89,10 @@ class Video
 	virtual void pause() = 0;
 	virtual bool getPaused() = 0;
 	virtual double getTime() = 0;
+		
+	virtual void SetVolume(float volume) = 0;
+	virtual void SetMute(bool mute) = 0;
+	virtual void SetQvMute(bool qvMute) = 0;
 	
 	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, IAudioDevicePtr audioDevice, int frameQueueSize);
 };
