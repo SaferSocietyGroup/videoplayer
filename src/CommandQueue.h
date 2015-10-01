@@ -34,6 +34,9 @@ enum CommandType
 	CTLogMessage       = 13,
 	CTForceRedraw      = 14,
 	CTSetPlaybackSpeed = 15,
+	CTSetVolume        = 16,
+	CTSetMute          = 17,
+	CTSetQvMute        = 18,
 
 	CTCmdCount
 };
@@ -67,6 +70,9 @@ const std::vector<std::vector<ArgumentType>> CommandArgs  = {
 	{ATInt32, ATInt32, ATStr, ATStr},   // log message (verbosity, lineNumber, file, message)
 	{},                                 // force redraw
 	{ATFloat},                          // set playback speed (speed)
+	{ATFloat},                          // set volume (volume)
+	{ATInt32},                          // set mute (1/0)
+	{ATInt32},                          // set quickviewmute (1/0)
 };
 
 struct Argument

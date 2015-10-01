@@ -57,6 +57,18 @@ class CAudioHandlerNoSound : public AudioHandlerNoSound
 		return 0;
 	}
 	
+	void SetVolume(float volume)
+	{
+	}
+
+	void SetMute(bool mute)
+	{
+	}
+
+	void SetQvMute(bool qvMute)
+	{
+	}
+	
 	void onSeek()
 	{
 	}

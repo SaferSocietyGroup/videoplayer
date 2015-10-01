@@ -46,6 +46,10 @@ class AudioHandler
 	virtual void clearQueue() = 0;
 	virtual int getAudioQueueSize() = 0;
 
+	virtual void SetVolume(float volume) = 0;
+	virtual void SetMute(bool mute) = 0;
+	virtual void SetQvMute(bool qvMute) = 0;
+
 	static AudioHandlerPtr Create(AVCodecContext* aCodecCtx, IAudioDevicePtr device, TimeHandlerPtr timeHandler); 
 };
 

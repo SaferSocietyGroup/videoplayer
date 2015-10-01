@@ -32,7 +32,7 @@ class CSdlAudioDevice : public SdlAudioDevice
 			data[i*2+1] = 0;
 		}
 	}
-
+	
 	bool Init(int freq, int channels, std::function<int(int16_t* data, int nSamples)> update)
 	{
 		this->update = update;

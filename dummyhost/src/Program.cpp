@@ -82,6 +82,9 @@ class CommandLine
 				{"update-output-size", CTUpdateOutputSize},
 				{"force-redraw", CTForceRedraw},
 				{"set-playback-speed", CTSetPlaybackSpeed},
+				{"set-volume", CTSetVolume},
+				{"set-mute", CTSetMute},
+				{"set-qv-mute", CTSetQvMute},
 			};
 
 			while(!done){

@@ -763,6 +763,21 @@ class CVideo : public Video
 	double getTime(){
 		return timeHandler->GetTime();
 	}
+	
+	void SetVolume(float volume)
+	{
+		audioHandler->SetVolume(volume);
+	}
+
+	void SetMute(bool mute)
+	{
+		audioHandler->SetMute(mute);
+	}
+
+	void SetQvMute(bool qvMute)
+	{
+		audioHandler->SetQvMute(qvMute);
+	}
 };
 
 bool CVideo::drm = false;

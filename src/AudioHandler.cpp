@@ -25,6 +25,7 @@
 #include <functional>
 #include <algorithm>
 #include <SDL.h>
+#include <cmath>
 
 #include "Flog.h"
 #include "AudioHandler.h"
@@ -92,6 +93,24 @@ class CAudioHandler : public AudioHandler
 
 		if(this->swr)
 			swr_free(&this->swr);
+	}
+	
+	void SetVolume(float volume)
+	{
+		volume = std::max(std::min(1.0f, volume), 0.0f);
+		volume = log10(volume * 9 + 1);
+
+		this->volume = volume;
+	}
+
+	void SetMute(bool mute)
+	{
+		this->mute = mute;
+	}
+
+	void SetQvMute(bool qvMute)
+	{
+		this->qvMute = qvMute;
 	}
 	
 	int getAudioQueueSize()
