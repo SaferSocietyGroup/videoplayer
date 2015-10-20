@@ -41,7 +41,7 @@ class CProgram : public Program
 	CommandQueuePtr qCmd;
 	SDL_Surface* window;
 
-	Video::ErrorCallback handleError;
+	Video::MessageCallback handleMessage;
 
 	void UpdateOutputSize(int w, int h)
 	{
@@ -118,7 +118,15 @@ class CProgram : public Program
 						s = lfs->Open(cmd.args[1].str);
 					}
 
-					video = Video::Create(s, handleError, audio, 64);
+					try {
+						video = Video::Create(s, handleMessage, audio, 64);
+					}
+
+					catch(VideoException e)
+					{
+						FlogE("couldn't open video: " << e.what());
+						video = 0;
+					}
 
 					if(video != 0){
 						FlogExpD(video->getReportedDurationInSecs());
@@ -204,8 +212,8 @@ class CProgram : public Program
 
 		SDL_Event event;
 				
-		handleError = [&](Video::Error e, const std::string& msg){
-			if(e == Video::EEof){
+		handleMessage = [&](Video::MessageType type, const std::string& msg){
+			if(type == Video::MEof){
 				cmdSend->SendCommand(CTEof);
 			}
 		};
@@ -232,15 +240,22 @@ class CProgram : public Program
 			}
 
 			if(video && overlay){
-				bool updated = video->update(0);
+				try {
+					bool updated = video->update(0);
 
-				if(updated){
-					SDL_LockYUVOverlay(overlay);
-					video->updateOverlay(overlay->pixels, overlay->pitches, overlay->w, overlay->h);
-					SDL_UnlockYUVOverlay(overlay);
-					redraw = true;
+					if(updated){
+						SDL_LockYUVOverlay(overlay);
+						video->updateOverlay(overlay->pixels, overlay->pitches, overlay->w, overlay->h);
+						SDL_UnlockYUVOverlay(overlay);
+						redraw = true;
 
-					cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
+						cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
+					}
+				}
+
+				catch(VideoException e)
+				{
+					FlogE(e.what());
 				}
 			}
 					
@@ -329,6 +344,12 @@ class CProgram : public Program
 		}
 
 		catch (std::runtime_error ex){
+			FlogF(ex.what());
+			return 1;
+		}
+
+		catch (VideoException ex)
+		{
 			FlogF(ex.what());
 			return 1;
 		}
