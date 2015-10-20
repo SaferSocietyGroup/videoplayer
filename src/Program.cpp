@@ -99,8 +99,17 @@ class CProgram : public Program
 				break;
 
 			case CTSeek:
-				if(video)
-					video->seek(cmd.args[0].f);
+				if(video){
+					try
+					{
+						video->seek(cmd.args[0].f);
+					}
+
+					catch(VideoException e)
+					{
+						FlogE(e.what());
+					}
+				}
 				break;
 
 			case CTLoad: {
@@ -333,7 +342,9 @@ class CProgram : public Program
 			Flog_SetCallback([&](Flog_Severity severity, int lineNumber, const char* file, const char* message){
 				std::wstring wmessage = Tools::StrToWstr(std::string(message));
 				std::wstring wfile = Tools::StrToWstr(std::string(file));
-				cmdSend->SendCommand(CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
+				if(cmdSend != 0){
+					cmdSend->SendCommand(CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
+				}
 			});
 
 			Interface();
