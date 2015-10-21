@@ -208,6 +208,9 @@ class CProgram : public Program
 	{
 		SDL_Init(SDL_INIT_EVERYTHING);
 
+		freopen( "CON", "w", stdout );
+		freopen( "CON", "w", stderr );
+
 		window = SDL_SetVideoMode(w, h, 0, 0);
 		FlogAssert(window, "could not set video mode");
 
