@@ -128,7 +128,7 @@ class CProgram : public Program
 					}
 
 					try {
-						video = Video::Create(s, handleMessage, audio, 64);
+						video = Video::Create(s, handleMessage, audio);
 					}
 
 					catch(VideoException e)
@@ -250,7 +250,7 @@ class CProgram : public Program
 
 			if(video && overlay){
 				try {
-					bool updated = video->update(0);
+					bool updated = video->update();
 
 					if(updated){
 						SDL_LockYUVOverlay(overlay);

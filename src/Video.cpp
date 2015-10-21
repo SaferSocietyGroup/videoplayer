@@ -132,7 +132,8 @@ class CVideo : public Video
 
 	int duration = 0;
 	int reachedEof = false;
-	int frameQueueSize = 0;
+	int maxFrameQueueSize = 0;
+	int minFrameQueueSize = 16;
 
 	PriorityQueue<FramePtr, CompareFrames> frameQueue;
 	
@@ -148,9 +149,9 @@ class CVideo : public Video
 	bool reportedEof = false;
 	StreamPtr stream;
 	
-	CVideo(MessageCallback messageCallback, int frameQueueSize){
+	CVideo(MessageCallback messageCallback){
 		this->messageCallback = messageCallback;
-		this->frameQueueSize = frameQueueSize;
+		this->maxFrameQueueSize = maxFrameQueueSize;
 		memset(&packet, 0, sizeof(AVPacket));
 		decFrame = avcodec_alloc_frame();
 	}
@@ -230,9 +231,8 @@ class CVideo : public Video
 		return audioHandler->fetchAudio(data, nSamples);
 	}
 
-	bool update(double deltaTime)
+	bool update()
 	{
-		addTime(deltaTime);
 		tick();
 		adjustTime();
 		FramePtr newFrame = fetchFrame();
@@ -327,9 +327,12 @@ class CVideo : public Video
 			try
 			{
 				while(
-					frameQueue.size() < (unsigned int)frameQueueSize || 
+					frameQueue.size() < (unsigned int)minFrameQueueSize || 
 					(hasAudioStream() && audioHandler->getAudioQueueSize() < audioDevice->GetBlockSize()))
 				{
+					if(frameQueue.size() >= (unsigned int)maxFrameQueueSize)
+						break;
+					
 					decodeFrame(true);
 				}
 					
@@ -481,6 +484,8 @@ class CVideo : public Video
 
 			retries--;
 		}
+
+		// never gets here
 	}
 
 	FrameType decodeFrame(bool addToQueue, bool initialDemux = true)
@@ -509,7 +514,6 @@ class CVideo : public Video
 					// Decode video
 					if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame, &frameFinished, &packet)) < 0 )
 					{
-						FlogExpD(bytesDecoded);
 						throw VideoException(VideoException::EDecodingVideo);
 					}
 
@@ -522,15 +526,11 @@ class CVideo : public Video
 				{
 					if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream], timeHandler->GetTimeWarp(), addToQueue)) <= 0)
 					{
-						FlogExpD(bytesDecoded);
 						throw VideoException(VideoException::EDecodingAudio);
 					}
 				}
 
 				if(decodeTries++ > 1024){
-					FlogExpD(bytesRemaining);
-					FlogExpD(bytesDecoded);
-					FlogExpD(decodeTries);
 					throw VideoException(VideoException::EDecodingVideo);
 				}
 				
@@ -711,6 +711,18 @@ class CVideo : public Video
 		FlogExpD(pFormatCtx->streams[videoStream]->r_frame_rate.num);
 		FlogExpD(pFormatCtx->streams[videoStream]->r_frame_rate.den);
 		FlogExpD(pFormatCtx->duration / AV_TIME_BASE);
+
+		// limit framequeue memory size
+		int frameMemSize = avpicture_get_size((AVPixelFormat)pCodecCtx->pix_fmt, w, h);
+		int maxVideoQueueMem = 512 * 1024 * 1024; // 512 MB
+		maxFrameQueueSize = maxVideoQueueMem / frameMemSize;
+
+		FlogExpD(maxFrameQueueSize);
+		FlogExpD(frameMemSize);
+
+		// cap to 128
+		maxFrameQueueSize = std::min(maxFrameQueueSize, 128);
+		FlogExpD(maxFrameQueueSize);
 	}
 
 	void closeFile(){
@@ -773,10 +785,6 @@ class CVideo : public Video
 		return timeHandler->GetPaused();
 	}
 
-	void addTime(double t){
-		timeHandler->AddTime(t);
-	}
-	
 	double getTime(){
 		return timeHandler->GetTime();
 	}
@@ -829,13 +837,13 @@ static void logCb(void *ptr, int level, const char *fmt, va_list vargs)
 	}
 }
 
-VideoPtr Video::Create(StreamPtr stream, MessageCallback messageCallback, IAudioDevicePtr audioDevice, int frameQueueSize)
+VideoPtr Video::Create(StreamPtr stream, MessageCallback messageCallback, IAudioDevicePtr audioDevice)
 {
 	static bool initialized = false;
 	if(!initialized)
 		av_register_all();
 
-	CVideo* video = new CVideo(messageCallback, frameQueueSize);
+	CVideo* video = new CVideo(messageCallback);
 
 	av_log_set_callback(logCb);
 	av_log_set_level(AV_LOG_WARNING);

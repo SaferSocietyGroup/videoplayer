@@ -68,7 +68,7 @@ class Video
 	virtual ~Video(){};
 	
 	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
-	virtual bool update(double deltaTime) = 0;
+	virtual bool update() = 0;
 	virtual void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h) = 0;
 
 	virtual bool seek(double ts) = 0;
@@ -102,7 +102,7 @@ class Video
 	virtual void SetMute(bool mute) = 0;
 	virtual void SetQvMute(bool qvMute) = 0;
 	
-	static VideoPtr Create(StreamPtr s, MessageCallback messageHandler, IAudioDevicePtr audioDevice, int frameQueueSize);
+	static VideoPtr Create(StreamPtr s, MessageCallback messageHandler, IAudioDevicePtr audioDevice);
 };
 
 #endif
