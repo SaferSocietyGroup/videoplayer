@@ -45,7 +45,7 @@ class CSdlAudioDevice : public SdlAudioDevice
 		fmt.freq = freq;
 		fmt.format = AUDIO_S16LSB;
 		fmt.channels = channels;
-		fmt.samples = 1024;
+		fmt.samples = 512;
 		fmt.callback = SdlCallback;
 		fmt.userdata = this;
 

@@ -36,31 +36,39 @@
 class Video;
 typedef std::shared_ptr<Video> VideoPtr;
 
-class Video
+struct VideoException : public std::exception
 {
-	public:
-	enum Error {
-		// proper errors
-		ENoError,
+	enum ErrorCode {
 		EFile,
 		EVideoCodec,
 		EStreamInfo,
 		EStream,
 		EDemuxing,
-		EDecoding,
+		EDecodingVideo,
+		EDecodingAudio,
 		ESeeking,
+	};
 
-		// messages rather than errors (TODO: rename enum / callback?)
-		EEof,
-		EUnloadedFile
+	ErrorCode errorCode;
+
+	std::string what();
+	VideoException(ErrorCode errorCode);
+};
+
+class Video
+{
+	public:
+	enum MessageType {
+		MEof,
+		MUnloadedFile
 	};
 	
-	typedef std::function<void(Error, const std::string&)> ErrorCallback;
+	typedef std::function<void(MessageType, const std::string&)> MessageCallback;
 
 	virtual ~Video(){};
 	
 	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
-	virtual bool update(double deltaTime) = 0;
+	virtual bool update() = 0;
 	virtual void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h) = 0;
 
 	virtual bool seek(double ts) = 0;
@@ -94,7 +102,7 @@ class Video
 	virtual void SetMute(bool mute) = 0;
 	virtual void SetQvMute(bool qvMute) = 0;
 	
-	static VideoPtr Create(StreamPtr s, ErrorCallback errorHandler, IAudioDevicePtr audioDevice, int frameQueueSize);
+	static VideoPtr Create(StreamPtr s, MessageCallback messageHandler, IAudioDevicePtr audioDevice);
 };
 
 #endif
