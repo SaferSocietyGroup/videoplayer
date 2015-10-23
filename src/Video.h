@@ -32,28 +32,10 @@
 #include "avlibs.h"
 #include "Stream.h"
 #include "IAudioDevice.h"
+#include "VideoException.h"
 
 class Video;
 typedef std::shared_ptr<Video> VideoPtr;
-
-struct VideoException : public std::exception
-{
-	enum ErrorCode {
-		EFile,
-		EVideoCodec,
-		EStreamInfo,
-		EStream,
-		EDemuxing,
-		EDecodingVideo,
-		EDecodingAudio,
-		ESeeking,
-	};
-
-	ErrorCode errorCode;
-
-	std::string what();
-	VideoException(ErrorCode errorCode);
-};
 
 class Video
 {

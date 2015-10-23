@@ -41,61 +41,7 @@
 #include "AudioHandlerNoSound.h"
 #include "TimeHandler.h"
 #include "PriorityQueue.h"
-
-typedef std::shared_ptr<class Frame> FramePtr;
-
-struct Frame
-{
-	AVFrame* avFrame;
-	uint8_t* buffer;
-	double pts;
-
-	Frame(AVFrame* avFrame, uint8_t* buffer, double pts) : avFrame(avFrame), buffer(buffer), pts(pts)
-	{
-	}
-	
-	~Frame()
-	{
-		if(avFrame != 0)
-			av_frame_free(&avFrame);
-
-		if(buffer != 0)
-			av_free(buffer);
-	}
-};
- 
-class CompareFrames
-{
-	public:
-	bool operator()(FramePtr a, FramePtr b) const
-	{
-		return a->pts > b->pts;
-	}
-};
-
-std::string VideoException::what()
-{
-	if((int)errorCode < 0 || (int)errorCode > (int)ESeeking){
-		return "unknown video exception";
-	}
-
-	std::vector<std::string> eStr = {
-		"file error",
-		"video codec error",
-		"stream info error",
-		"stream error",
-		"demuxing error",
-		"decoding video error",
-		"decoding audio error",
-		"seeking error",
-	};
-
-	return eStr[(int)errorCode];
-}
-
-VideoException::VideoException(ErrorCode errorCode){
-	this->errorCode = errorCode;
-}
+#include "Frame.h"
 
 struct PanicException : public std::runtime_error {
 	PanicException(std::string str) : std::runtime_error(str) {}
@@ -139,10 +85,8 @@ class CVideo : public Video
 	
 	double lastDecodedPts = .0;
 	double lastFrameQueuePts = .0;
-	int64_t lastDts = 0;
 	int64_t firstPts = 0;
-
-	AVFrame* decFrame = 0;
+	bool firstPtsSet = false;
 
 	FramePtr currentFrame = 0;
 	float t = 0.0f;
@@ -153,13 +97,11 @@ class CVideo : public Video
 		this->messageCallback = messageCallback;
 		this->maxFrameQueueSize = maxFrameQueueSize;
 		memset(&packet, 0, sizeof(AVPacket));
-		decFrame = avcodec_alloc_frame();
 	}
 
 	~CVideo(){
 		closeFile();
 		emptyFrameQueue();
-		av_free(decFrame);
 	}
 
 	FramePtr fetchFrame()
@@ -173,17 +115,17 @@ class CVideo : public Video
 		if(stepIntoQueue && !frameQueue.empty())
 		{
 			stepIntoQueue = false;
-			timeHandler->SetTime(frameQueue.top()->pts + .001);
+			timeHandler->SetTime(timeFromPts(frameQueue.top()->GetPts()) + .001);
 		}
 
 		double time = timeHandler->GetTime();
 
-		FramePtr newFrame;
+		FramePtr newFrame = 0;
 
 		// Throw away all old frames (timestamp older than now) except for the last
 		// and set the pFrame pointer to that.
 
-		while(!frameQueue.empty() && frameQueue.top()->pts < time)
+		while(!frameQueue.empty() && timeFromPts(frameQueue.top()->GetPts()) < time)
 		{
 			newFrame = frameQueue.top();
 			frameQueue.pop();
@@ -215,7 +157,7 @@ class CVideo : public Video
 			return;
 
 		double time = timeHandler->GetTime();
-		double pts = frameQueue.top()->pts;
+		double pts = timeFromPts(frameQueue.top()->GetPts());
 
 		// If the next frame is far into the future or the past, 
 		// set the time to now
@@ -237,13 +179,13 @@ class CVideo : public Video
 		adjustTime();
 		FramePtr newFrame = fetchFrame();
 
-		if(newFrame != 0 && newFrame->avFrame){
+		if(newFrame != 0){
 			// Don't free currentFrame if it is currentFrame itself that's being converted
-			if(currentFrame == 0 || currentFrame->avFrame != newFrame->avFrame){
+			if(currentFrame == 0 || currentFrame->GetAvFrame() != newFrame->GetAvFrame()){
 				currentFrame = newFrame; // Save the current frame for snapshots etc.
 			}
 
-			lastFrameQueuePts = newFrame->pts;
+			lastFrameQueuePts = timeFromPts(newFrame->GetPts());
 					
 			return true;
 		}
@@ -270,7 +212,8 @@ class CVideo : public Video
 				pCodecCtx->pix_fmt, w, h, fffmt, SWS_BILINEAR, NULL, NULL, NULL);
 
 		if(swsCtx){
-			sws_scale(swsCtx, (uint8_t**)currentFrame->avFrame->data, currentFrame->avFrame->linesize, 0, pCodecCtx->height, pict.data, pict.linesize); 
+			sws_scale(swsCtx, (uint8_t**)currentFrame->GetAvFrame()->data, currentFrame->GetAvFrame()->linesize, 0, 
+				pCodecCtx->height, pict.data, pict.linesize); 
 			sws_freeContext(swsCtx);
 		}else{
 			FlogE("Failed to get a scaling context");
@@ -437,7 +380,6 @@ class CVideo : public Video
 
 	int64_t tsFromTime(double sec)
 	{
-		FlogExpD(av_q2d(pFormatCtx->streams[videoStream]->time_base));
 		return sec / av_q2d(pFormatCtx->streams[videoStream]->time_base);
 	}
 	
@@ -451,41 +393,58 @@ class CVideo : public Video
 		timeHandler->SetTimeWarp(speed);
 	}
 
-	void demux()
+	bool demux()
 	{
+		int tries = 0;
+
 		do{
 			// Read frames until we get a frame from the video or audio stream
 			freePacket();
 			int ret = 0;
 			if((ret = av_read_frame(pFormatCtx, &packet)) < 0){
 				freePacket();
-				throw VideoException(VideoException::EDemuxing);
+
+				if(tries++ > 100)
+					return false;
 			}
 		} while(packet.stream_index != videoStream && packet.stream_index != audioStream);
+
+		return true;
 	}
 
-	FrameType decodeFrameWithRetries(bool addToQueue, bool initialDemux = true)
+	bool decodePacket(FrameType& frameType, FramePtr decFrame, int& frameFinished, bool addToQueue)
 	{
-		int retries = 30;
+		int bytesRemaining = packet.size;
+		int bytesDecoded = 0;
+		int decodeTries = 0;
 
-		while(true){
-			try
+		// Decode until all bytes in the read frame is decoded
+		while(bytesRemaining > 0)
+		{
+			if(packet.stream_index == videoStream)
 			{
-				FrameType ret = decodeFrame(addToQueue, initialDemux);
-				return ret;
+				// Decode video
+				if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame->GetAvFrame(), &frameFinished, &packet)) < 0 )
+					FlogW("avcodec_decode_video2() failed, trying again");
+
+				frameType = TVideo;
 			}
 
-			catch(VideoException e)
+			else
 			{
-				if(retries < 1){
-					throw e;
-				}
+				if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream], timeHandler->GetTimeWarp(), addToQueue)) <= 0)
+					FlogW("audio decoder failed, trying again");
+
+				frameType = TAudio;
 			}
 
-			retries--;
+			if(decodeTries++ > 1000)
+				return false;
+
+			bytesRemaining -= bytesDecoded;
 		}
 
-		// never gets here
+		return true;
 	}
 
 	FrameType decodeFrame(bool addToQueue, bool initialDemux = true)
@@ -494,58 +453,39 @@ class CVideo : public Video
 		FrameType ret = TAudio;
 
 		bool doDemux = initialDemux;
+	
+		FramePtr decFrame = Frame::Create(avcodec_alloc_frame(), (uint8_t*)0, 0, true);
 
 		while(frameFinished == 0)
 		{
-			if(doDemux)
-				demux();
+			if(doDemux){
+				if(!demux()){
+					FlogE("demuxing failed");
+					throw VideoException(VideoException::EDemuxing);
+				}
+			}
 
 			doDemux = true;
 
-			int bytesRemaining = packet.size;
-			int bytesDecoded = 0;
-			int decodeTries = 0;
-
-			// Decode until all bytes in the read frame is decoded
-			while(bytesRemaining > 0)
-			{
-				if(packet.stream_index == videoStream)
-				{
-					// Decode video
-					if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame, &frameFinished, &packet)) < 0 )
-					{
-						throw VideoException(VideoException::EDecodingVideo);
-					}
-
-					lastDts = packet.dts;
-
-					ret = TVideo;
-				}
-
-				else
-				{
-					if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream], timeHandler->GetTimeWarp(), addToQueue)) <= 0)
-					{
-						throw VideoException(VideoException::EDecodingAudio);
-					}
-				}
-
-				if(decodeTries++ > 1024){
-					throw VideoException(VideoException::EDecodingVideo);
-				}
-				
-				bytesRemaining -= bytesDecoded;
+			if(!decodePacket(ret, decFrame, frameFinished, addToQueue)){
+				FlogE("decoding failed");
+				throw VideoException(VideoException::EDecodingVideo);
 			}
 		}
 		
-		int64_t pts = av_frame_get_best_effort_timestamp(decFrame);
-		this->lastDecodedPts = timeFromPts(av_frame_get_best_effort_timestamp(decFrame));
+		if(ret == TVideo){
+			int64_t pts = av_frame_get_best_effort_timestamp(decFrame->GetAvFrame());
+			decFrame->SetPts(pts);
+			this->lastDecodedPts = timeFromPts(pts);
 
-		if(firstPts == 0 || pts < firstPts)
-			firstPts = pts;
+			if(!firstPtsSet || pts < firstPts){
+				firstPts = pts;
+				firstPtsSet = true;
+			}
 
-		if(addToQueue && ret == TVideo){
-			frameQueue.push(cloneFrame(decFrame, this->lastDecodedPts));
+			if(addToQueue){
+				frameQueue.push(decFrame->Clone());
+			}
 		}
 
 		return ret;
@@ -553,33 +493,20 @@ class CVideo : public Video
 
 	bool decodeVideoFrame(){
 		for(int i = 0; i < 100; i++){
-			if(decodeFrameWithRetries(false) == TVideo){
-				return true;
+			try {
+				if(decodeFrame(false) == TVideo){
+					return true;
+				}
+			}
+			catch(VideoException e)
+			{
+				FlogW("While decoding video frame");
+				FlogW(e.what());
 			}
 		}
 
 		FlogD("couldn't find a video frame in 100 steps");
 		return false;
-	}
-
-	FramePtr cloneFrame(AVFrame* src, double pts){
-		AVFrame* avFrame = av_frame_alloc();
-		uint8_t *buffer = (uint8_t *)av_malloc(avpicture_get_size((AVPixelFormat)src->format, src->width, src->height));
-
-		if(!buffer || !avFrame){
-			if(avFrame)
-				av_frame_free(&avFrame);
-
-			if(buffer)
-				av_free(buffer);
-
-			throw std::runtime_error("allocation failed in cloneframe");
-		}
-
-		avpicture_fill((AVPicture *) avFrame, buffer, pCodecCtx->pix_fmt, src->width, src->height);
-		av_picture_copy((AVPicture*)avFrame, (AVPicture*)decFrame, pCodecCtx->pix_fmt, src->width, src->height);
-
-		return std::make_shared<Frame>(avFrame, buffer, pts);
 	}
 
 	// Raw byte seeking
@@ -599,6 +526,7 @@ class CVideo : public Video
 	// Seek by timestamp
 	bool seekTs(double t){
 		FlogExpD(firstPts);
+		FlogExpD(tsFromTime(firstPts));
 		FlogExpD(t);
 		FlogExpD(tsFromTime(t));
 
@@ -606,22 +534,33 @@ class CVideo : public Video
 		if(t <= 0.0)
 			t = -1;
 
-		int seekRet = av_seek_frame(pFormatCtx, videoStream, tsFromTime(t) + firstPts, AVSEEK_FLAG_ANY);
+		//int flags = 0;
+
+		//if(t < timeHandler->GetTime())
+		//	flags |= AVSEEK_FLAG_BACKWARD;
+
+		//int seekRet = av_seek_frame(pFormatCtx, videoStream, tsFromTime(t) + firstPts, flags);
+
+		int64_t minTs = tsFromTime(t - 5.0) + firstPts;
+		int64_t maxTs = tsFromTime(t) + firstPts;
+		int64_t ts = tsFromTime(t) + firstPts;
+
+		int seekRet = avformat_seek_file(pFormatCtx, videoStream, minTs, ts, maxTs, AVSEEK_FLAG_ANY);
 
 		if(seekRet > 0){
-			FlogD("av_seek_frame failed, returned " << seekRet);
+			FlogD("avformat_seek_file failed, returned " << seekRet);
 			return false;
 		}
 
 		avcodec_flush_buffers(pCodecCtx);
 
-		bool ret = decodeVideoFrame();
+		do{
+			if(!decodeVideoFrame())
+				return false;
 
-		return ret;
-	}
+		}while(lastDecodedPts < t + timeFromPts(firstPts));
 
-	bool seekKf(int frame){
-		return false;
+		return true;
 	}
 
 	void emptyFrameQueue(){
@@ -746,28 +685,6 @@ class CVideo : public Video
 
 	bool IsEof(){
 		return reachedEof > 100;
-	}
-
-	// frame = frame number
-	// returns false on error
-	bool decodePacket(int& frame, bool& isKeyFrame, bool& needsMorePackets){
-		int isFinished = 0;
-		int ret = avcodec_decode_video2(pCodecCtx, decFrame, &isFinished, &packet);
-		
-		if(ret < 0){
-			return false;
-		}
-
-		if(isFinished){
-			frame = duration;
-			isKeyFrame = (decFrame->key_frame != 0);
-			needsMorePackets = false;
-			duration++;
-			return true;
-		}
-
-		needsMorePackets = true;
-		return true;
 	}
 
 	int getSampleRate(){
