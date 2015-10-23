@@ -52,9 +52,13 @@ class CAudioHandlerNoSound : public AudioHandlerNoSound
 		return 0;
 	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToQueue)
+	int decode(AVPacket& packet, AVStream* stream, double timeWarp, FramePtr frame, int& frameFinished)
 	{
 		return 0;
+	}
+	
+	void EnqueueAudio(const std::vector<Sample>& samples)
+	{
 	}
 	
 	void SetVolume(float volume)

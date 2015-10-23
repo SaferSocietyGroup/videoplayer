@@ -42,20 +42,11 @@
 #include "TimeHandler.h"
 #include "PriorityQueue.h"
 #include "Frame.h"
-
-struct PanicException : public std::runtime_error {
-	PanicException(std::string str) : std::runtime_error(str) {}
-};
+#include "Packet.h"
 
 class CVideo : public Video
 {
 	public:
-	enum FrameType
-	{
-		TVideo,
-		TAudio
-	};
-
 	MessageCallback messageCallback;
 	bool stepIntoQueue = true;
 
@@ -73,9 +64,6 @@ class CVideo : public Video
 	AVCodecContext* pCodecCtx = 0;
 	AVCodec *pCodec = 0;
 	
-	AVPicture pict;
-	AVPacket packet;
-
 	int duration = 0;
 	int reachedEof = false;
 	int maxFrameQueueSize = 0;
@@ -96,7 +84,6 @@ class CVideo : public Video
 	CVideo(MessageCallback messageCallback){
 		this->messageCallback = messageCallback;
 		this->maxFrameQueueSize = maxFrameQueueSize;
-		memset(&packet, 0, sizeof(AVPacket));
 	}
 
 	~CVideo(){
@@ -196,6 +183,8 @@ class CVideo : public Video
 	void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h)
 	{
 		PixelFormat fffmt = AV_PIX_FMT_YUYV422;
+		AVPicture pict;
+
 		int avret = avpicture_fill(&pict, NULL, fffmt, w, h);
 
 		if(avret < 0){
@@ -276,7 +265,12 @@ class CVideo : public Video
 					if(frameQueue.size() >= (unsigned int)maxFrameQueueSize)
 						break;
 					
-					decodeFrame(true);
+					FramePtr frame = decodeFrame();
+					if(frame->type == Frame::TVideo){
+						frameQueue.push(frame->Clone());
+					}else{
+						audioHandler->EnqueueAudio(frame->GetSamples());
+					}
 				}
 					
 				success = true;
@@ -357,11 +351,6 @@ class CVideo : public Video
 		return std::max(lastFrameQueuePts - timeFromPts(firstPts), .0);
 	}
 
-	void freePacket(){
-		av_free_packet(&packet);
-		memset(&packet, 0, sizeof(AVPacket));
-	}
-
 	float getAspect(){
 		return ((float)w * getPAR()) / h;
 	}
@@ -393,49 +382,49 @@ class CVideo : public Video
 		timeHandler->SetTimeWarp(speed);
 	}
 
-	bool demux()
+	PacketPtr demuxPacket()
 	{
 		int tries = 0;
+		PacketPtr packet = Packet::Create();
 
 		do{
 			// Read frames until we get a frame from the video or audio stream
-			freePacket();
 			int ret = 0;
-			if((ret = av_read_frame(pFormatCtx, &packet)) < 0){
-				freePacket();
-
+			if((ret = av_read_frame(pFormatCtx, &packet->avPacket)) < 0){
 				if(tries++ > 100)
-					return false;
+					return 0;
 			}
-		} while(packet.stream_index != videoStream && packet.stream_index != audioStream);
+		} while(packet->avPacket.stream_index != videoStream && packet->avPacket.stream_index != audioStream);
 
-		return true;
+		return packet;
 	}
 
-	bool decodePacket(FrameType& frameType, FramePtr decFrame, int& frameFinished, bool addToQueue)
+	bool decodePacket(PacketPtr packet, FramePtr decFrame, int& frameFinished)
 	{
-		int bytesRemaining = packet.size;
+		int bytesRemaining = packet->avPacket.size;
 		int bytesDecoded = 0;
 		int decodeTries = 0;
 
 		// Decode until all bytes in the read frame is decoded
 		while(bytesRemaining > 0)
 		{
-			if(packet.stream_index == videoStream)
+			if(packet->avPacket.stream_index == videoStream)
 			{
 				// Decode video
-				if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame->GetAvFrame(), &frameFinished, &packet)) < 0 )
+				if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame->GetAvFrame(), &frameFinished, &packet->avPacket)) < 0 )
 					FlogW("avcodec_decode_video2() failed, trying again");
 
-				frameType = TVideo;
+				decFrame->type = Frame::TVideo;
 			}
 
 			else
 			{
-				if((bytesDecoded = audioHandler->decode(packet, pFormatCtx->streams[audioStream], timeHandler->GetTimeWarp(), addToQueue)) <= 0)
+				if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], 
+						timeHandler->GetTimeWarp(), decFrame, frameFinished)) <= 0){
 					FlogW("audio decoder failed, trying again");
+				}
 
-				frameType = TAudio;
+				decFrame->type = Frame::TAudio;
 			}
 
 			if(decodeTries++ > 1000)
@@ -447,54 +436,45 @@ class CVideo : public Video
 		return true;
 	}
 
-	FrameType decodeFrame(bool addToQueue, bool initialDemux = true)
+	FramePtr decodeFrame()
 	{
 		int frameFinished = 0;
-		FrameType ret = TAudio;
-
-		bool doDemux = initialDemux;
-	
 		FramePtr decFrame = Frame::Create(avcodec_alloc_frame(), (uint8_t*)0, 0, true);
 
 		while(frameFinished == 0)
 		{
-			if(doDemux){
-				if(!demux()){
-					FlogE("demuxing failed");
-					throw VideoException(VideoException::EDemuxing);
-				}
+			PacketPtr packet = demuxPacket();
+			if(packet == 0){
+				FlogE("demuxing failed");
+				return 0;
 			}
 
-			doDemux = true;
-
-			if(!decodePacket(ret, decFrame, frameFinished, addToQueue)){
+			if(!decodePacket(packet, decFrame, frameFinished)){
 				FlogE("decoding failed");
-				throw VideoException(VideoException::EDecodingVideo);
+				return 0;
 			}
 		}
 		
-		if(ret == TVideo){
-			int64_t pts = av_frame_get_best_effort_timestamp(decFrame->GetAvFrame());
-			decFrame->SetPts(pts);
+		int64_t pts = av_frame_get_best_effort_timestamp(decFrame->GetAvFrame());
+		decFrame->SetPts(pts);
+		
+		if(decFrame->type == Frame::TVideo){
 			this->lastDecodedPts = timeFromPts(pts);
 
 			if(!firstPtsSet || pts < firstPts){
 				firstPts = pts;
 				firstPtsSet = true;
 			}
-
-			if(addToQueue){
-				frameQueue.push(decFrame->Clone());
-			}
 		}
 
-		return ret;
+		return decFrame;
 	}
 
 	bool decodeVideoFrame(){
 		for(int i = 0; i < 100; i++){
 			try {
-				if(decodeFrame(false) == TVideo){
+				FramePtr frame = decodeFrame();
+				if(frame->type == Frame::TVideo){
 					return true;
 				}
 			}
@@ -665,8 +645,6 @@ class CVideo : public Video
 	}
 
 	void closeFile(){
-		freePacket();
-
 		if(pCodecCtx)
 			avcodec_close(pCodecCtx);
 

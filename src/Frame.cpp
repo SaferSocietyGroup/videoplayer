@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "Frame.h"
 
 class CFrame : public Frame
@@ -7,10 +9,23 @@ class CFrame : public Frame
 	uint8_t* buffer;
 	int64_t pts = AV_NOPTS_VALUE;
 	bool shallowFree;
+	FrameType type;
+	std::vector<Sample> samples;
 
 	CFrame(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shallowFree) 
 		: avFrame(avFrame), buffer(buffer), pts(pts), shallowFree(shallowFree)
 	{
+	}
+	
+	const std::vector<Sample>& GetSamples()
+	{
+		return samples;
+	}
+
+	void AddSamples(const std::vector<Sample>& newSamples)
+	{
+		samples.reserve(samples.size() + newSamples.size());
+		samples.insert(samples.end(), newSamples.begin(), newSamples.end());
 	}
 	
 	AVFrame* GetAvFrame()
@@ -27,7 +42,7 @@ class CFrame : public Frame
 	{
 		this->pts = pts;
 	}
-
+	
 	FramePtr Clone()
 	{
 		AVFrame* src = this->avFrame;

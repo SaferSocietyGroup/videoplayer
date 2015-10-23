@@ -32,12 +32,6 @@
 #include "avlibs.h"
 #include "TimeHandler.h"
 
-struct Sample {
-	int16_t chn[2];
-	double ts = 0.0f;
-	int frameIndex = 0;
-};
-
 class CAudioHandler : public AudioHandler
 {
 	IAudioDevicePtr device;
@@ -202,17 +196,15 @@ class CAudioHandler : public AudioHandler
 		return fetched;
 	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp, bool addToQueue){
+	int decode(AVPacket& packet, AVStream* stream, double timeWarp, FramePtr frame, int& frameFinished){
 		if(!aCodec)
 			return -1;
 
-		AVFrame* frame = av_frame_alloc();
-		FlogAssert(frame, "could not allocate frame");
+		AVFrame* avFrame = frame->GetAvFrame();
 
-		int got_frame = 0;
-		int bytesDecoded = avcodec_decode_audio4(aCodecCtx, frame, &got_frame, &packet);
+		int bytesDecoded = avcodec_decode_audio4(aCodecCtx, avFrame, &frameFinished, &packet);
 
-		if(bytesDecoded >= 0 && got_frame){
+		if(bytesDecoded >= 0 && frameFinished){
 			int freq = device->GetRate();
 			int channels = device->GetChannels();
 
@@ -224,12 +216,12 @@ class CAudioHandler : public AudioHandler
 			}
 
 			if(!this->swr){
-				int64_t chLayout = frame->channel_layout != 0 ? frame->channel_layout : 
-					av_get_default_channel_layout(frame->channels);
+				int64_t chLayout = avFrame->channel_layout != 0 ? avFrame->channel_layout : 
+					av_get_default_channel_layout(avFrame->channels);
 
 				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(channels), 
-					AV_SAMPLE_FMT_S16, freq / timeWarp, chLayout, (AVSampleFormat)frame->format, 
-					frame->sample_rate, 0, NULL);
+					AV_SAMPLE_FMT_S16, freq / timeWarp, chLayout, (AVSampleFormat)avFrame->format, 
+					avFrame->sample_rate, 0, NULL);
 
 				FlogAssert(this->swr, "error allocating swr");
 				
@@ -240,32 +232,41 @@ class CAudioHandler : public AudioHandler
 
 				FlogAssert(ret >= 0, "error allocating samples: " << ret);
 			}
+
+			int dstSampleCount = av_rescale_rnd(avFrame->nb_samples, freq / timeWarp, aCodecCtx->sample_rate, AV_ROUND_UP);
+
+			int samplesConverted = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)avFrame->data, avFrame->nb_samples);
+			double ts = timeFromPts(av_frame_get_best_effort_timestamp(avFrame), stream->time_base);
+
+			if(samplesConverted >= 0){
+				std::vector<Sample> samples(samplesConverted);
 				
-			double ts = timeFromPts(frame->pkt_dts != AV_NOPTS_VALUE ? frame->pkt_pts : frame->pkt_dts, stream->time_base);
-
-			int dstSampleCount = av_rescale_rnd(frame->nb_samples, freq / timeWarp, aCodecCtx->sample_rate, AV_ROUND_UP);
-
-			int ret = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)frame->data, frame->nb_samples);
-
-			if(ret >= 0 && addToQueue){
-				device->Lock(true);
-				for(int i = 0; i < dstSampleCount; i++){
-					Sample smp;
+				int i = 0;
+				for(auto& smp : samples){
 					smp.chn[0] = ((int16_t*)dstBuf[0])[i * 2];
 					smp.chn[1] = ((int16_t*)dstBuf[0])[i * 2 + 1];
 					smp.ts = ts;
 					smp.frameIndex = frameIndex;
-					queue.push(smp);
+					i++;
 				}
-				device->Lock(false);
+
+				frame->AddSamples(samples);
 			}
 			
 			frameIndex++;
 		}
 
-		av_frame_free(&frame);
-
 		return bytesDecoded;
+	}
+	
+	void EnqueueAudio(const std::vector<Sample>& data)
+	{
+		device->Lock(true);
+
+		for(auto smp : data)
+			queue.push(smp);
+
+		device->Lock(false);
 	}
 	
 	void onSeek()
