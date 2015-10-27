@@ -87,13 +87,11 @@ class CProgram : public Program
 				break;
 
 			case CTPlay:
-				audio->SetPaused(false);
 				if(video)
 					video->play();
 				break;
 
 			case CTPause:
-				audio->SetPaused(true);
 				if(video)
 					video->pause();
 				break;
@@ -138,8 +136,7 @@ class CProgram : public Program
 					}
 
 					if(video != 0){
-						FlogExpD(video->getReportedDurationInSecs());
-						cmdSend->SendCommand(CTDuration, video->getReportedDurationInSecs());
+						cmdSend->SendCommand(CTDuration, video->getDuration());
 					}
 						
 

@@ -19,10 +19,11 @@ class Frame
 	enum FrameType
 	{
 		TVideo,
-		TAudio
+		TAudio,
+		TUnknown
 	};
 
-	FrameType type;
+	FrameType type = TUnknown;
 
 	virtual AVFrame* GetAvFrame() = 0;
 	virtual int64_t GetPts() = 0;

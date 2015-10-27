@@ -5,7 +5,7 @@
 
 std::string VideoException::what()
 {
-	if((int)errorCode < 0 || (int)errorCode > (int)ESeeking){
+	if((int)errorCode < 0 || (int)errorCode > (int)ERetries){
 		return "unknown video exception";
 	}
 
@@ -18,6 +18,7 @@ std::string VideoException::what()
 		"decoding video error",
 		"decoding audio error",
 		"seeking error",
+		"exceeded maximum number of retries",
 	};
 
 	return eStr[(int)errorCode];
