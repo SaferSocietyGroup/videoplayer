@@ -16,14 +16,10 @@ struct Sample {
 class Frame
 {
 	public:
-	enum FrameType
-	{
-		TVideo,
-		TAudio,
-		TUnknown
-	};
+	bool hasVideo = false;
+	bool hasAudio = false;
 
-	FrameType type = TUnknown;
+	int finished = 0;
 
 	virtual AVFrame* GetAvFrame() = 0;
 	virtual int64_t GetPts() = 0;
@@ -32,7 +28,11 @@ class Frame
 	virtual void AddSamples(const std::vector<Sample>& samples) = 0;
 	virtual const std::vector<Sample>& GetSamples() = 0;
 	
+	// create a frame from an existing avFrame
 	static FramePtr Create(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shallowFree);
+
+	// create a new, empty avFrame for decoding onto
+	static FramePtr CreateEmpty();
 };
 
 class CompareFrames

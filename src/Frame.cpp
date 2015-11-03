@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include "Frame.h"
+#include "Flog.h"
 
 class CFrame : public Frame
 {
@@ -9,7 +10,6 @@ class CFrame : public Frame
 	uint8_t* buffer;
 	int64_t pts = AV_NOPTS_VALUE;
 	bool shallowFree;
-	FrameType type;
 	std::vector<Sample> samples;
 
 	CFrame(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shallowFree) 
@@ -83,4 +83,9 @@ class CFrame : public Frame
 FramePtr Frame::Create(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shallowFree)
 {
 	return std::make_shared<CFrame>(avFrame, buffer, pts, shallowFree);
+}
+	
+FramePtr CreateEmpty()
+{
+	return std::make_shared<CFrame>(avcodec_alloc_frame(), (uint8_t*)0, 0, true);
 }

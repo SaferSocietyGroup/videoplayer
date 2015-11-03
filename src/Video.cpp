@@ -44,6 +44,8 @@
 #include "Frame.h"
 #include "Packet.h"
 
+typedef std::map<int, FramePtr> StreamFrameMap;
+
 class CVideo : public Video
 {
 	public:
@@ -275,6 +277,12 @@ class CVideo : public Video
 
 	void tick(){
 		bool success = false;
+
+		StreamFrameMap streamFrames;
+
+		streamFrames[videoStream] = Frame::CreateEmpty();
+		streamFrames[audioStream] = Frame::CreateEmpty();
+
 		while(!IsEof() && !success)
 		{
 			try
@@ -288,14 +296,16 @@ class CVideo : public Video
 					if(frameQueue.size() >= (unsigned int)maxFrameQueueSize)
 						break;
 					
-					FramePtr frame = decodeFrame();
+					FramePtr frame = decodeFrame(streamFrames);
 
 					if(frame == 0)
 						throw VideoException(VideoException::EDecodingVideo);
 
-					if(frame->type == Frame::TVideo){
+					if(frame->hasVideo){
 						frameQueue.push(frame->Clone());
-					}else{
+					}
+					
+					if(frame->hasAudio){
 						audioHandler->EnqueueAudio(frame->GetSamples());
 					}
 				}
@@ -384,7 +394,7 @@ class CVideo : public Video
 		return packet;
 	}
 
-	bool decodePacket(PacketPtr packet, FramePtr decFrame, int& frameFinished)
+	bool decodePacket(PacketPtr packet, StreamFrameMap& streamFrames)
 	{
 		int bytesRemaining = packet->avPacket.size;
 		int bytesDecoded = 0;
@@ -392,6 +402,22 @@ class CVideo : public Video
 		// Decode until all bytes in the read frame is decoded
 		while(bytesRemaining > 0)
 		{
+			int idx = packet->avPacket.stream_index;
+			auto it = streamFrames.find(idx);
+			if(it != mymap.end()){
+				FramePtr frame = it->second;
+
+				switch(pCodecCtx->streams[idx]->codec->type){
+					case AVMEDIA_TYPE_VIDEO:
+						break;
+
+					case AVMEDIA_TYPE_AUDIO;
+						break;
+
+					default:
+				}
+			}
+
 			if(packet->avPacket.stream_index == videoStream)
 			{
 				// Decode video
@@ -400,11 +426,7 @@ class CVideo : public Video
 					Retry();
 				}
 
-				if(decFrame->type == Frame::TAudio){
-					FlogW("frame changed type to video");
-				}
-
-				decFrame->type = Frame::TVideo;
+				decFrame->hasVideo = true;
 			}
 
 			else
@@ -415,11 +437,7 @@ class CVideo : public Video
 					Retry();
 				}
 
-				if(decFrame->type == Frame::TVideo){
-					FlogW("frame changed type to audio");
-				}
-
-				decFrame->type = Frame::TAudio;
+				decFrame->hasAudio = true;
 			}
 
 			bytesRemaining -= bytesDecoded;
@@ -430,11 +448,8 @@ class CVideo : public Video
 		return true;
 	}
 
-	FramePtr decodeFrame()
+	bool decodeFrame(StreamFrameMap& streamFrames)
 	{
-		int frameFinished = 0;
-		FramePtr decFrame = Frame::Create(avcodec_alloc_frame(), (uint8_t*)0, 0, true);
-
 		while(frameFinished == 0)
 		{
 			PacketPtr packet = demuxPacket();
@@ -443,7 +458,7 @@ class CVideo : public Video
 				return 0;
 			}
 
-			if(!decodePacket(packet, decFrame, frameFinished)){
+			if(!decodePacket(packet, streamFrames)){
 				FlogE("decoding failed");
 				return 0;
 			}
@@ -469,7 +484,7 @@ class CVideo : public Video
 					return false;
 				}
 
-				if(frame->type == Frame::TVideo){
+				if(frame->hasVideo){
 					return frame;
 				}
 			}

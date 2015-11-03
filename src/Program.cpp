@@ -80,6 +80,8 @@ class CProgram : public Program
 
 	void HandleCommand(Command cmd)
 	{
+		FlogExpD(cmd.type);
+
 		switch(cmd.type){
 			case CTQuit:
 				done = true;
