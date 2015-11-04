@@ -303,15 +303,17 @@ class CVideo : public Video
 						throw VideoException(VideoException::EDecodingVideo);
 
 					if(streamFrames[videoStream]->finished != 0){
-						frameQueue.push(streamFrames[videoStream]);
+						frameQueue.push(streamFrames[videoStream]->Clone());
+						streamFrames[videoStream] = Frame::CreateEmpty();
 					}
 					
 					if(streamFrames[audioStream]->finished != 0){
 						audioHandler->EnqueueAudio(streamFrames[audioStream]->GetSamples());
+						streamFrames[audioStream] = Frame::CreateEmpty();
 					}
 				}
 
-				// sync framequeue target size with 
+				// sync framequeue target size with number of frames needed for audio queue 
 				if(targetFrameQueueSize < (int)frameQueue.size()){
 					targetFrameQueueSize = std::max((int)frameQueue.size(), minFrameQueueSize);
 				}
@@ -395,7 +397,7 @@ class CVideo : public Video
 		return packet;
 	}
 
-	bool decodePacket(PacketPtr packet, StreamFrameMap& streamFrames)
+	void decodePacket(PacketPtr packet, StreamFrameMap& streamFrames)
 	{
 		int bytesRemaining = packet->avPacket.size;
 
@@ -436,8 +438,6 @@ class CVideo : public Video
 
 			Retry();
 		}
-
-		return true;
 	}
 
 	bool decodeFrame(StreamFrameMap& streamFrames)
@@ -454,10 +454,7 @@ class CVideo : public Video
 			}
 
 			// decode
-			if(!decodePacket(packet, streamFrames)){
-				FlogE("decoding failed");
-				return 0;
-			}
+			decodePacket(packet, streamFrames);
 
 			// check if any frames finished
 			for(auto pair : streamFrames){
