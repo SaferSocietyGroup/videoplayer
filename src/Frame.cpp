@@ -85,7 +85,7 @@ FramePtr Frame::Create(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shal
 	return std::make_shared<CFrame>(avFrame, buffer, pts, shallowFree);
 }
 	
-FramePtr CreateEmpty()
+FramePtr Frame::CreateEmpty()
 {
 	return std::make_shared<CFrame>(avcodec_alloc_frame(), (uint8_t*)0, 0, true);
 }

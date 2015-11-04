@@ -34,6 +34,7 @@
 #include <algorithm>
 #include <stdexcept>
 #include <iomanip>
+#include <map>
 
 #include "Video.h"
 #include "Flog.h"
@@ -296,17 +297,17 @@ class CVideo : public Video
 					if(frameQueue.size() >= (unsigned int)maxFrameQueueSize)
 						break;
 					
-					FramePtr frame = decodeFrame(streamFrames);
+					bool frameDecoded = decodeFrame(streamFrames);
 
-					if(frame == 0)
+					if(!frameDecoded)
 						throw VideoException(VideoException::EDecodingVideo);
 
-					if(frame->hasVideo){
-						frameQueue.push(frame->Clone());
+					if(streamFrames[videoStream]->finished != 0){
+						frameQueue.push(streamFrames[videoStream]);
 					}
 					
-					if(frame->hasAudio){
-						audioHandler->EnqueueAudio(frame->GetSamples());
+					if(streamFrames[audioStream]->finished != 0){
+						audioHandler->EnqueueAudio(streamFrames[audioStream]->GetSamples());
 					}
 				}
 
@@ -397,47 +398,38 @@ class CVideo : public Video
 	bool decodePacket(PacketPtr packet, StreamFrameMap& streamFrames)
 	{
 		int bytesRemaining = packet->avPacket.size;
-		int bytesDecoded = 0;
 
 		// Decode until all bytes in the read frame is decoded
 		while(bytesRemaining > 0)
 		{
+			int bytesDecoded = 0;
 			int idx = packet->avPacket.stream_index;
 			auto it = streamFrames.find(idx);
-			if(it != mymap.end()){
+
+			if(it != streamFrames.end()){
 				FramePtr frame = it->second;
 
-				switch(pCodecCtx->streams[idx]->codec->type){
+				switch(pFormatCtx->streams[idx]->codec->codec_type){
 					case AVMEDIA_TYPE_VIDEO:
+						if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, frame->GetAvFrame(), &frame->finished, &packet->avPacket)) < 0 ){
+							FlogW("avcodec_decode_video2() failed, trying again");
+							Retry();
+						}
+						frame->hasVideo = true;
 						break;
 
-					case AVMEDIA_TYPE_AUDIO;
+					case AVMEDIA_TYPE_AUDIO:
+						if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], 
+										timeHandler->GetTimeWarp(), frame, frame->finished)) <= 0){
+							FlogW("audio decoder failed, trying again");
+							Retry();
+						}
+						frame->hasAudio = true;
 						break;
 
 					default:
+						break;
 				}
-			}
-
-			if(packet->avPacket.stream_index == videoStream)
-			{
-				// Decode video
-				if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, decFrame->GetAvFrame(), &frameFinished, &packet->avPacket)) < 0 ){
-					FlogW("avcodec_decode_video2() failed, trying again");
-					Retry();
-				}
-
-				decFrame->hasVideo = true;
-			}
-
-			else
-			{
-				if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], 
-						timeHandler->GetTimeWarp(), decFrame, frameFinished)) <= 0){
-					FlogW("audio decoder failed, trying again");
-					Retry();
-				}
-
-				decFrame->hasAudio = true;
 			}
 
 			bytesRemaining -= bytesDecoded;
@@ -450,42 +442,54 @@ class CVideo : public Video
 
 	bool decodeFrame(StreamFrameMap& streamFrames)
 	{
-		while(frameFinished == 0)
+		bool done = false;
+
+		while(!done)
 		{
+			// demux
 			PacketPtr packet = demuxPacket();
 			if(packet == 0){
 				FlogE("demuxing failed");
 				return 0;
 			}
 
+			// decode
 			if(!decodePacket(packet, streamFrames)){
 				FlogE("decoding failed");
 				return 0;
 			}
 
+			// check if any frames finished
+			for(auto pair : streamFrames){
+				FramePtr frame = pair.second;
+				if(frame->finished != 0){
+					// set timestamp and break out of loop
+					int64_t pts = av_frame_get_best_effort_timestamp(frame->GetAvFrame());
+					frame->SetPts(pts);
+					done = true;
+				}
+			}
+
 			Retry();
 		}
-		
-		int64_t pts = av_frame_get_best_effort_timestamp(decFrame->GetAvFrame());
-		decFrame->SetPts(pts);
 		
 		// successfully decoded frame, reset retry counter
 		ResetRetries();
 
-		return decFrame;
+		return true;
 	}
 
 	FramePtr decodeVideoFrame(){
+		StreamFrameMap streamFrames;
+		streamFrames[videoStream] = Frame::CreateEmpty();
+
 		for(int i = 0; i < 100; i++){
 			try {
-				FramePtr frame = decodeFrame();
-				if(frame == 0){
+				bool ret = decodeFrame(streamFrames);
+
+				if(!ret){
 					FlogW("failed to decode frame");
 					return false;
-				}
-
-				if(frame->hasVideo){
-					return frame;
 				}
 			}
 
