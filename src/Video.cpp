@@ -81,7 +81,6 @@ class CVideo : public Video
 	double lastFrameQueuePts = .0;
 
 	FramePtr currentFrame = 0;
-	float t = 0.0f;
 	bool reportedEof = false;
 	StreamPtr stream;
 	
@@ -238,7 +237,8 @@ class CVideo : public Video
 		}
 
 		double lastDecodedPts = .0;
-		FlogExpD(ts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
+		double videoTimeFromStart = .0;
+		int steps = 0;
 
 		do{
 			FramePtr frame;
@@ -249,12 +249,18 @@ class CVideo : public Video
 			}
 
 			lastDecodedPts = timeFromTs(frame->GetPts());
-			FlogExpD(lastDecodedPts);
-			FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
+			videoTimeFromStart = lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time);
 
-		}while(lastDecodedPts < t + timeFromTs(pFormatCtx->streams[videoStream]->start_time));
+			/*FlogExpD(lastDecodedPts);
+			FlogExpD(ts);
+			FlogExpD(timeFromTs(pFormatCtx->streams[videoStream]->start_time));
+			FlogExpD(videoTimeFromStart);*/
 
-		FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
+			steps++;
+
+		}while(videoTimeFromStart < ts);
+
+		FlogD("seeked to video position: " << videoTimeFromStart << ", timestamp: " << lastDecodedPts << " in " << steps << " steps");
 
 		timeHandler->SetTime(lastDecodedPts);
 		stepIntoQueue = true;
