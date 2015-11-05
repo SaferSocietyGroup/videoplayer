@@ -254,7 +254,7 @@ class CVideo : public Video
 
 		}while(lastDecodedPts < t + timeFromTs(pFormatCtx->streams[videoStream]->start_time));
 
-		FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time);
+		FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
 
 		timeHandler->SetTime(lastDecodedPts);
 		stepIntoQueue = true;
