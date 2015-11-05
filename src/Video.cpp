@@ -44,6 +44,7 @@
 #include "PriorityQueue.h"
 #include "Frame.h"
 #include "Packet.h"
+#include "Tools.h"
 
 typedef std::map<int, FramePtr> StreamFrameMap;
 
@@ -62,7 +63,8 @@ class CVideo : public Video
 
 	int audioStream = 0;
 	int videoStream = 0;
-	int maxRetries = 100;
+	unsigned maxRetries = 100;
+	std::vector<std::string> retryStack;
 
 	AVFormatContext* pFormatCtx = 0;
 	AVCodecContext* pCodecCtx = 0;
@@ -70,7 +72,6 @@ class CVideo : public Video
 	
 	static bool drm;
 	
-	int retries = 0;
 	int maxFrameQueueSize = 0;
 	int minFrameQueueSize = 16;
 	int targetFrameQueueSize = 16;
@@ -105,12 +106,12 @@ class CVideo : public Video
 		if(stepIntoQueue && !frameQueue.empty())
 		{
 			stepIntoQueue = false;
-			timeHandler->SetTime(timeFromPts(frameQueue.top()->GetPts()) + .001);
+			timeHandler->SetTime(timeFromTs(frameQueue.top()->GetPts()) + .001);
 		}
 
 		double time = timeHandler->GetTime();
 
-		//FlogD("time: " << time << ", queue: " << timeFromPts(frameQueue.top()->GetPts()));
+		//FlogD("time: " << time << ", queue: " << timeFromTs(frameQueue.top()->GetPts()));
 
 		FramePtr newFrame = 0;
 
@@ -118,7 +119,7 @@ class CVideo : public Video
 		// and set the pFrame pointer to that.
 		int poppedFrames = 0;
 
-		while(!frameQueue.empty() && timeFromPts(frameQueue.top()->GetPts()) < time)
+		while(!frameQueue.empty() && timeFromTs(frameQueue.top()->GetPts()) < time)
 		{
 			newFrame = frameQueue.top();
 			frameQueue.pop();
@@ -155,7 +156,7 @@ class CVideo : public Video
 			return;
 
 		double time = timeHandler->GetTime();
-		double pts = timeFromPts(frameQueue.top()->GetPts());
+		double pts = timeFromTs(frameQueue.top()->GetPts());
 
 		// If the next frame is far into the future or the past, 
 		// set the time to now
@@ -183,7 +184,7 @@ class CVideo : public Video
 				currentFrame = newFrame; // Save the current frame for snapshots etc.
 			}
 
-			lastFrameQueuePts = timeFromPts(newFrame->GetPts());
+			lastFrameQueuePts = timeFromTs(newFrame->GetPts());
 					
 			return true;
 		}
@@ -237,24 +238,23 @@ class CVideo : public Video
 		}
 
 		double lastDecodedPts = .0;
-		FlogExpD(ts - timeFromPts(pFormatCtx->streams[videoStream]->start_time));
+		FlogExpD(ts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
 
-		//FlogD(to);
-		
 		do{
 			FramePtr frame;
 
-			if((frame = decodeVideoFrame()) == 0){
+			if((frame = decodeUntilVideoFrame()) == 0){
 				FlogE("failed to decode video frame");
 				return false;
 			}
 
-			lastDecodedPts = timeFromPts(frame->GetPts());
+			lastDecodedPts = timeFromTs(frame->GetPts());
 			FlogExpD(lastDecodedPts);
+			FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time));
 
-		}while(lastDecodedPts < t + timeFromPts(pFormatCtx->streams[videoStream]->start_time));
+		}while(lastDecodedPts < t + timeFromTs(pFormatCtx->streams[videoStream]->start_time));
 
-		FlogExpD(lastDecodedPts);
+		FlogExpD(lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time);
 
 		timeHandler->SetTime(lastDecodedPts);
 		stepIntoQueue = true;
@@ -323,7 +323,7 @@ class CVideo : public Video
 
 			catch(VideoException e)
 			{
-				Retry();
+				Retry(Str("Exception in tick: " << e.what()));
 			}
 		}
 	}
@@ -360,14 +360,14 @@ class CVideo : public Video
 	}
 
 	double getPosition(){
-		return std::max(lastFrameQueuePts - timeFromPts(pFormatCtx->streams[videoStream]->start_time), .0);
+		return std::max(lastFrameQueuePts - timeFromTs(pFormatCtx->streams[videoStream]->start_time), .0);
 	}
 
 	float getAspect(){
 		return ((float)w * getPAR()) / h;
 	}
 
-	double timeFromPts(uint64_t pts){
+	double timeFromTs(uint64_t pts){
 		return (double)pts * av_q2d(pFormatCtx->streams[videoStream]->time_base);
 	}
 
@@ -382,15 +382,13 @@ class CVideo : public Video
 
 	PacketPtr demuxPacket()
 	{
-		int tries = 0;
 		PacketPtr packet = Packet::Create();
 
 		do{
 			// Read frames until we get a frame from the video or audio stream
 			int ret = 0;
 			if((ret = av_read_frame(pFormatCtx, &packet->avPacket)) < 0){
-				if(tries++ > 100)
-					return 0;
+				Retry("av_read_frame failed in demuxPacket");
 			}
 		} while(packet->avPacket.stream_index != videoStream && packet->avPacket.stream_index != audioStream);
 
@@ -413,9 +411,8 @@ class CVideo : public Video
 
 				switch(pFormatCtx->streams[idx]->codec->codec_type){
 					case AVMEDIA_TYPE_VIDEO:
-						if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, frame->GetAvFrame(), &frame->finished, &packet->avPacket)) < 0 ){
-							FlogW("avcodec_decode_video2() failed, trying again");
-							Retry();
+						if( (bytesDecoded = avcodec_decode_video2(pCodecCtx, frame->GetAvFrame(), &frame->finished, &packet->avPacket)) <= 0 ){
+							Retry(Str("avcodec_decode_video2() failed in decodePacket, returned: " << bytesDecoded));
 						}
 						frame->hasVideo = true;
 						break;
@@ -423,8 +420,7 @@ class CVideo : public Video
 					case AVMEDIA_TYPE_AUDIO:
 						if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], 
 										timeHandler->GetTimeWarp(), frame, frame->finished)) <= 0){
-							FlogW("audio decoder failed, trying again");
-							Retry();
+							Retry(Str("audio decoder failed in decodePacket, returned: " << bytesDecoded));
 						}
 						frame->hasAudio = true;
 						break;
@@ -432,11 +428,15 @@ class CVideo : public Video
 					default:
 						break;
 				}
+			}else{
+				// stream not handled
+				return;
 			}
 
 			bytesRemaining -= bytesDecoded;
 
-			Retry();
+			if(bytesRemaining > 0)
+				Retry(Str("decodePacket not finished, bytesRemaining: " << bytesRemaining << ", bytesDecoded: " << bytesDecoded));
 		}
 	}
 
@@ -466,8 +466,6 @@ class CVideo : public Video
 					done = true;
 				}
 			}
-
-			Retry();
 		}
 		
 		// successfully decoded frame, reset retry counter
@@ -476,7 +474,7 @@ class CVideo : public Video
 		return true;
 	}
 
-	FramePtr decodeVideoFrame(){
+	FramePtr decodeUntilVideoFrame(){
 		StreamFrameMap streamFrames;
 		streamFrames[videoStream] = Frame::CreateEmpty();
 
@@ -488,6 +486,10 @@ class CVideo : public Video
 					FlogW("failed to decode frame");
 					return false;
 				}
+
+				// throw away any resulting frames
+				if(streamFrames[videoStream]->finished != 0)
+					return streamFrames[videoStream];
 			}
 
 			catch(VideoException e)
@@ -496,7 +498,7 @@ class CVideo : public Video
 				FlogW(e.what());
 			}
 
-			Retry();
+			Retry("not a video frame in decodeUntilVideoFrame()");
 		}
 
 		FlogD("couldn't find a video frame in 100 steps");
@@ -513,7 +515,7 @@ class CVideo : public Video
 		}
 
 		avcodec_flush_buffers(pCodecCtx);
-		decodeVideoFrame();
+		decodeUntilVideoFrame();
 		return true;
 	}
 
@@ -522,7 +524,7 @@ class CVideo : public Video
 		int64_t firstPts = pFormatCtx->streams[videoStream]->start_time;
 
 		FlogExpD(firstPts);
-		FlogExpD(tsFromTime(firstPts));
+		FlogExpD(timeFromTs(firstPts));
 		FlogExpD(t);
 		FlogExpD(tsFromTime(t));
 
@@ -668,18 +670,26 @@ class CVideo : public Video
 	}
 
 	bool IsEof(){
-		return retries > maxRetries;
+		return retryStack.size() > maxRetries;
 	}
 
-	void Retry()
+	void Retry(std::string desc)
 	{
-		if(retries++ > maxRetries)
+		retryStack.push_back(desc);
+		if(retryStack.size() > maxRetries){
+			FlogW("Maximum number of retries reached, they were spent on:");
+
+			for(auto str : retryStack){
+				FlogW(" * " << str);
+			}
+
 			throw VideoException(VideoException::ERetries);
+		}
 	}
 
 	void ResetRetries()
 	{
-		retries = 0;
+		retryStack.clear();
 		reportedEof = false;
 	}
 
