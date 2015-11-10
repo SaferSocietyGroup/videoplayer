@@ -238,12 +238,12 @@ class CVideo : public Video
 
 		double backSeek = (double)depth * 2.0f + 1.0f;
 
-		int64_t minTs = tsFromTime(t - backSeek - 2.5) + firstTs;
-		int64_t ts = tsFromTime(t - backSeek) + firstTs;
-		int64_t maxTs = tsFromTime(t - backSeek) + firstTs;
+		int64_t minTs = std::max(tsFromTime(t - backSeek - 2.5) + firstTs, (int64_t)0);
+		int64_t ts = std::max(tsFromTime(t - backSeek) + firstTs, (int64_t)0);
+		int64_t maxTs = std::max(tsFromTime(t - backSeek) + firstTs, (int64_t)0);
 
-		int flags = AVSEEK_FLAG_ANY;
-
+		int flags = 0;
+		
 		if(ts < pFormatCtx->streams[videoStream]->cur_dts)
 			flags |= AVSEEK_FLAG_BACKWARD;
 
