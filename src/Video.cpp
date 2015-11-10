@@ -83,6 +83,9 @@ class CVideo : public Video
 	FramePtr currentFrame = 0;
 	bool reportedEof = false;
 	StreamPtr stream;
+
+	int64_t firstDts = AV_NOPTS_VALUE;
+	int64_t firstPts = AV_NOPTS_VALUE;
 	
 	CVideo(MessageCallback messageCallback){
 		this->messageCallback = messageCallback;
@@ -106,11 +109,10 @@ class CVideo : public Video
 		{
 			stepIntoQueue = false;
 			timeHandler->SetTime(timeFromTs(frameQueue.top()->GetPts()) + .001);
+			audioHandler->discardQueueUntilTs(timeHandler->GetTime());
 		}
 
 		double time = timeHandler->GetTime();
-
-		//FlogD("time: " << time << ", queue: " << timeFromTs(frameQueue.top()->GetPts()));
 
 		FramePtr newFrame = 0;
 
@@ -128,8 +130,11 @@ class CVideo : public Video
 		if(poppedFrames > 1){
 			FlogD("skipped " << poppedFrames - 1 << " frames");
 		}
+		
+		if(newFrame != 0 && (newFrame->GetPts() >= time || stepIntoQueue))
+			return newFrame;
 
-		return newFrame;
+		return 0;
 	}
 
 	// some decoders (eg. wmv) return invalid timestamps that are not
@@ -184,7 +189,6 @@ class CVideo : public Video
 			}
 
 			lastFrameQueuePts = timeFromTs(newFrame->GetPts());
-					
 			return true;
 		}
 
@@ -219,55 +223,81 @@ class CVideo : public Video
 			FlogE("Failed to get a scaling context");
 		}
 	}
+	
+	bool seekInternal(double t, int depth){
+		if(depth > 5){
+			FlogW("seeking failed, tried too many times");
+			return false;
+		}
 
-	bool seek(double ts){
+		ResetRetries();
 		emptyFrameQueue();
 		audioHandler->clearQueue();
 
-		if(!seekTs(ts)){
-			// Try to seek with raw byte seeking
-			if(!seekRaw(ts)){
-				FlogD("seek failed");
-				return false;
-			}else{
-				FlogD("used seekRaw");
-			}
-		}else{
-			FlogD("used seekTs");
+		int64_t firstTs = getFirstSeekTs();
+
+		double backSeek = (double)depth * 2.0f + 1.0f;
+
+		int64_t minTs = tsFromTime(t - backSeek - 2.5) + firstTs;
+		int64_t ts = tsFromTime(t - backSeek) + firstTs;
+		int64_t maxTs = tsFromTime(t - backSeek) + firstTs;
+
+		int flags = AVSEEK_FLAG_ANY;
+
+		if(ts < pFormatCtx->streams[videoStream]->cur_dts)
+			flags |= AVSEEK_FLAG_BACKWARD;
+
+		int seekRet = avformat_seek_file(pFormatCtx, videoStream, minTs, ts, maxTs, flags);
+
+		if(seekRet > 0){
+			FlogD("avformat_seek_file failed, returned " << seekRet);
+			return false;
 		}
 
-		double lastDecodedPts = .0;
-		double videoTimeFromStart = .0;
-		int steps = 0;
+		avcodec_flush_buffers(pCodecCtx);
 
-		do{
-			FramePtr frame;
+		double newTime = t + timeFromTs(firstPts) - 1.0 / getFrameRate();
+		double actualTime = skipToTs(newTime);
 
-			if((frame = decodeUntilVideoFrame()) == 0){
-				FlogE("failed to decode video frame");
-				return false;
-			}
+		// consider the seek failed and try again if the actual time diffs more than .5 seconds
+		// from the desired new time. 
+		
+		FlogD("wanted to seek to " << newTime << " and ended up at " << actualTime);
 
-			lastDecodedPts = timeFromTs(frame->GetPts());
-			videoTimeFromStart = lastDecodedPts - timeFromTs(pFormatCtx->streams[videoStream]->start_time);
+		if(fabsf(newTime - actualTime) > .5){
+			FlogD("not good enough, trying again");
+			return seekInternal(t, depth + 1);
+		}
 
-			/*FlogExpD(lastDecodedPts);
-			FlogExpD(ts);
-			FlogExpD(timeFromTs(pFormatCtx->streams[videoStream]->start_time));
-			FlogExpD(videoTimeFromStart);*/
+		timeHandler->SetTime(actualTime);
 
-			steps++;
-
-		}while(videoTimeFromStart < ts);
-
-		FlogD("seeked to video position: " << videoTimeFromStart << ", timestamp: " << lastDecodedPts << " in " << steps << " steps");
-
-		timeHandler->SetTime(lastDecodedPts);
 		stepIntoQueue = true;
 
 		audioHandler->onSeek();
 
 		return true;
+	}
+
+	bool seek(double ts){
+		// if the video is currently playing,
+		// pause it temporarily during seeking so that
+		// not frames aren't dropped because of lost time during seeking
+		
+		bool tmpPause = !timeHandler->GetPaused();
+
+		if(tmpPause){
+			audioDevice->SetPaused(true);
+			timeHandler->Pause();
+		}
+
+		bool ret = seekInternal(ts, 0);
+
+		if(tmpPause){
+			audioDevice->SetPaused(false);
+			timeHandler->Play();
+		}
+
+		return ret;
 	}
 
 	/* Step to next frame */
@@ -280,6 +310,39 @@ class CVideo : public Video
 	bool stepBack(){
 		float t = timeHandler->GetTime(), fps = getFrameRate();
 		return seek(floorf(t * fps - 2.0));
+	}
+	
+	double skipToTs(double ts){
+		StreamFrameMap streamFrames;
+		streamFrames[videoStream] = Frame::CreateEmpty();
+
+		double ret = -100000000000.0;
+
+		while(true)
+		{
+			try
+			{
+				bool frameDecoded = decodeFrame(streamFrames);
+				if(!frameDecoded)
+					throw VideoException(VideoException::EDecodingVideo);
+
+				if(streamFrames[videoStream]->finished != 0){
+					if(timeFromTs(streamFrames[videoStream]->GetPts()) >= ts){
+						ret = timeFromTs(streamFrames[videoStream]->GetPts());
+						break;
+					}
+
+					streamFrames[videoStream] = Frame::CreateEmpty();
+				}
+			}
+
+			catch(VideoException e)
+			{
+				Retry(Str("Exception in tick: " << e.what()));
+			}
+		}
+
+		return ret;
 	}
 
 	void tick(){
@@ -314,7 +377,15 @@ class CVideo : public Video
 					}
 					
 					if(streamFrames[audioStream]->finished != 0){
-						audioHandler->EnqueueAudio(streamFrames[audioStream]->GetSamples());
+						// only enqueue audio that's newer than the current video time, 
+						// eg. on seeking we might encounter audio that's older than the frames in the frame queue.
+						if(streamFrames[audioStream]->GetSamples().size() > 0 && 
+							streamFrames[audioStream]->GetSamples()[0].ts >= timeHandler->GetTime())
+						{
+							audioHandler->EnqueueAudio(streamFrames[audioStream]->GetSamples());
+						}else{
+							FlogD("skipping old audio samples: " << streamFrames[audioStream]->GetSamples().size());
+						}
 						streamFrames[audioStream] = Frame::CreateEmpty();
 					}
 				}
@@ -355,8 +426,8 @@ class CVideo : public Video
 	}
 
 	float getFrameRate(){
-		AVRational avgfps = pFormatCtx->streams[videoStream]->avg_frame_rate;
-		return avgfps.num != 0 && avgfps.den != 0 ? (float)av_q2d(pFormatCtx->streams[videoStream]->avg_frame_rate) : 30.0f;
+		AVRational avFps = av_guess_frame_rate(pFormatCtx, pFormatCtx->streams[videoStream], NULL);
+		return avFps.num != 0 && avFps.den != 0 ? (float)av_q2d(avFps) : 30.0f;
 	}
 
 	float getPAR(){
@@ -366,7 +437,7 @@ class CVideo : public Video
 	}
 
 	double getPosition(){
-		return std::max(lastFrameQueuePts - timeFromTs(pFormatCtx->streams[videoStream]->start_time), .0);
+		return std::max(lastFrameQueuePts - timeFromTs(firstPts), .0);
 	}
 
 	float getAspect(){
@@ -468,6 +539,17 @@ class CVideo : public Video
 				if(frame->finished != 0){
 					// set timestamp and break out of loop
 					int64_t pts = av_frame_get_best_effort_timestamp(frame->GetAvFrame());
+
+					if(firstDts == AV_NOPTS_VALUE){
+						firstDts = frame->GetAvFrame()->pkt_dts;
+						FlogD("setting firstDts to: " << firstDts);
+					}
+
+					if(firstPts == AV_NOPTS_VALUE){
+						firstPts = pts;
+						FlogD("setting firstPts to: " << firstPts);
+					}
+
 					frame->SetPts(pts);
 					done = true;
 				}
@@ -511,50 +593,9 @@ class CVideo : public Video
 		return 0;
 	}
 
-	// Raw byte seeking
-	bool seekRaw(double ts){
-		double to = ts / getDuration() - 1.0;
-		int64_t fileSize = avio_size(pFormatCtx->pb);
-		if(av_seek_frame(pFormatCtx, -1, (int64_t)((double)fileSize * to), AVSEEK_FLAG_BYTE) < 0){
-			FlogE("Raw seeking error");
-			return false;
-		}
-
-		avcodec_flush_buffers(pCodecCtx);
-		decodeUntilVideoFrame();
-		return true;
-	}
-
-	// Seek by timestamp
-	bool seekTs(double t){
-		int64_t firstPts = pFormatCtx->streams[videoStream]->start_time;
-
-		FlogExpD(firstPts);
-		FlogExpD(timeFromTs(firstPts));
-		FlogExpD(t);
-		FlogExpD(tsFromTime(t));
-
-		int64_t minTs = tsFromTime(std::max(t - 5.0, .0)) + firstPts;
-		int64_t maxTs = tsFromTime(t) + firstPts;
-		int64_t ts = tsFromTime(t) + firstPts;
-		
-		int flags = AVSEEK_FLAG_ANY;
-
-		if(ts < pFormatCtx->streams[videoStream]->cur_dts)
-			flags |= AVSEEK_FLAG_BACKWARD;
-
-		FlogExpD(flags | AVSEEK_FLAG_BACKWARD);
-
-		int seekRet = avformat_seek_file(pFormatCtx, videoStream, minTs, ts, maxTs, flags);
-
-		if(seekRet > 0){
-			FlogD("avformat_seek_file failed, returned " << seekRet);
-			return false;
-		}
-
-		avcodec_flush_buffers(pCodecCtx);
-
-		return true;
+	int64_t getFirstSeekTs()
+	{
+		return pFormatCtx->iformat->flags & AVFMT_SEEK_TO_PTS ? firstPts : firstDts;
 	}
 
 	void emptyFrameQueue(){
@@ -641,21 +682,16 @@ class CVideo : public Video
 		w = pCodecCtx->width;
 		h = pCodecCtx->height;
 
-		FlogExpD(pFormatCtx->streams[videoStream]->r_frame_rate.num);
-		FlogExpD(pFormatCtx->streams[videoStream]->r_frame_rate.den);
-		FlogExpD(pFormatCtx->duration / AV_TIME_BASE);
-
 		// limit framequeue memory size
 		int frameMemSize = avpicture_get_size((AVPixelFormat)pCodecCtx->pix_fmt, w, h);
 		int maxVideoQueueMem = 512 * 1024 * 1024; // 512 MB
 		maxFrameQueueSize = maxVideoQueueMem / frameMemSize;
 
-		FlogExpD(maxFrameQueueSize);
-		FlogExpD(frameMemSize);
-
 		// cap to 256
 		maxFrameQueueSize = std::min(maxFrameQueueSize, 256);
-		FlogExpD(maxFrameQueueSize);
+
+		// tick the video so that firstPts and firstDts are set
+		tick();
 	}
 
 	void closeFile(){

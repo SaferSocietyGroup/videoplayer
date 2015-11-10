@@ -52,7 +52,7 @@ class CAudioHandler : public AudioHandler
 	
 	std::queue<Sample> queue;
 	
-	double timeFromPts(uint64_t pts, AVRational timeBase){
+	double timeFromTs(uint64_t pts, AVRational timeBase){
 		return (double)pts * av_q2d(timeBase);
 	}
 
@@ -113,6 +113,15 @@ class CAudioHandler : public AudioHandler
 		int size = (int)queue.size();
 		device->Lock(false);
 		return size;
+	}
+	
+	void discardQueueUntilTs(double ts)
+	{
+		device->Lock(true);
+		while(!queue.empty() && queue.front().ts < ts){
+			queue.pop();
+		}
+		device->Lock(false);
 	}
 	
 	void clearQueue()
@@ -236,7 +245,7 @@ class CAudioHandler : public AudioHandler
 			int dstSampleCount = av_rescale_rnd(avFrame->nb_samples, freq / timeWarp, aCodecCtx->sample_rate, AV_ROUND_UP);
 
 			int samplesConverted = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)avFrame->data, avFrame->nb_samples);
-			double ts = timeFromPts(av_frame_get_best_effort_timestamp(avFrame), stream->time_base);
+			double ts = timeFromTs(av_frame_get_best_effort_timestamp(avFrame), stream->time_base);
 
 			if(samplesConverted >= 0){
 				std::vector<Sample> samples(samplesConverted);

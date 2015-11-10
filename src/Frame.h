@@ -9,7 +9,8 @@ typedef std::shared_ptr<class Frame> FramePtr;
 
 struct Sample {
 	int16_t chn[2];
-	double ts = 0.0f;
+	double ts = 0.0;
+	double dts = 0.0;
 	int frameIndex = 0;
 };
 

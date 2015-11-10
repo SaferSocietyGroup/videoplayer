@@ -44,6 +44,10 @@ class CAudioHandlerNoSound : public AudioHandlerNoSound
 	void clearQueue()
 	{
 	}
+	
+	void discardQueueUntilTs(double ts)
+	{
+	}
 
 	int fetchAudio(int16_t* data, int nSamples)
 	{

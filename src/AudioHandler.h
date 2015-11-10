@@ -45,6 +45,7 @@ class AudioHandler
 	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
 	virtual void onSeek() = 0;
 	virtual void clearQueue() = 0;
+	virtual void discardQueueUntilTs(double ts) = 0;
 	virtual int getAudioQueueSize() = 0;
 	virtual void EnqueueAudio(const std::vector<Sample>& samples) = 0;
 
