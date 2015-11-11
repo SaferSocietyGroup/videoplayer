@@ -495,8 +495,7 @@ class CVideo : public Video
 						break;
 
 					case AVMEDIA_TYPE_AUDIO:
-						if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], 
-										timeHandler->GetTimeWarp(), frame, frame->finished)) <= 0){
+						if((bytesDecoded = audioHandler->decode(packet->avPacket, pFormatCtx->streams[audioStream], frame, frame->finished)) <= 0){
 							Retry(Str("audio decoder failed in decodePacket, returned: " << bytesDecoded));
 						}
 						frame->hasAudio = true;

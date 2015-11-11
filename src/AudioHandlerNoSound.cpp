@@ -52,11 +52,11 @@ class CAudioHandlerNoSound : public AudioHandlerNoSound
 	int fetchAudio(int16_t* data, int nSamples)
 	{
 		float time = 1.0 / (double)device->GetRate() * (double)nSamples;
-		timeHandler->AddTime(time);
+		timeHandler->AddTime(time * timeHandler->GetTimeWarp());
 		return 0;
 	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp, FramePtr frame, int& frameFinished)
+	int decode(AVPacket& packet, AVStream* stream, FramePtr frame, int& frameFinished)
 	{
 		return 0;
 	}

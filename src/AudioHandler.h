@@ -41,7 +41,7 @@ class AudioHandler
 	virtual int getChannels() = 0;
 	virtual int getBitRate() = 0;
 	virtual const char* getCodec() = 0;
-	virtual int decode(AVPacket& packet, AVStream* stream, double timeWarp, FramePtr frame, int& frameFinished) = 0;
+	virtual int decode(AVPacket& packet, AVStream* stream, FramePtr frame, int& frameFinished) = 0;
 	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
 	virtual void onSeek() = 0;
 	virtual void clearQueue() = 0;

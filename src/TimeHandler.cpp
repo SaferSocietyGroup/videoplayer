@@ -95,7 +95,7 @@ class CTimeHandler : public TimeHandler
 	{
 		audioDevice->Lock(true);
 		if(!paused)
-			time += t * warp;
+			time += t;
 		audioDevice->Lock(false);
 	}
 };
