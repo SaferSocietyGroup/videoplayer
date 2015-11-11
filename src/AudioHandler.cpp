@@ -133,7 +133,7 @@ class CAudioHandler : public AudioHandler
 		device->Lock(false);
 	}
 
-	int fetchAudio(int16_t* data, int nSamples)
+	int dequeueAudio(int16_t* data, int nSamples)
 	{
 		int fetched = 0;
 		bool noSamples = queue.empty();
@@ -205,7 +205,37 @@ class CAudioHandler : public AudioHandler
 		return fetched;
 	}
 
-	int decode(AVPacket& packet, AVStream* stream, double timeWarp, FramePtr frame, int& frameFinished){
+	void Resample(const int16_t* src, int nSamplesSrc, int16_t* dst, int nSamplesDst)
+	{
+		float ratio = (float)nSamplesSrc / (float)nSamplesDst;
+		float readIdx = 0;
+
+		for(int i = 0; i < nSamplesDst; i++){
+			dst[i * 2 + 0] = src[(int)readIdx * 2 + 0];
+			dst[i * 2 + 1] = src[(int)readIdx * 2 + 1];
+			readIdx += ratio;
+		}
+	}
+	
+	int fetchAudio(int16_t* data, int nSamples)
+	{
+		float warp = timeHandler->GetTimeWarp();
+		warp = std::max(.01f, warp);
+
+		int requestSampleCount = nSamples * warp;
+		int channels = 2;
+
+		int16_t src[requestSampleCount * channels];
+
+		int nSamplesSrc = dequeueAudio(src, requestSampleCount);
+		int nSamplesDst = nSamplesSrc / warp;
+
+		Resample(src, nSamplesSrc, data, nSamplesDst);		
+
+		return nSamplesDst;
+	}
+
+	int decode(AVPacket& packet, AVStream* stream, FramePtr frame, int& frameFinished){
 		if(!aCodec)
 			return -1;
 
@@ -217,19 +247,12 @@ class CAudioHandler : public AudioHandler
 			int freq = device->GetRate();
 			int channels = device->GetChannels();
 
-			if(lastTimeWarp != timeWarp){
-				lastTimeWarp = timeWarp;
-
-				if(this->swr)
-					swr_free(&this->swr);
-			}
-
 			if(!this->swr){
 				int64_t chLayout = avFrame->channel_layout != 0 ? avFrame->channel_layout : 
 					av_get_default_channel_layout(avFrame->channels);
 
 				this->swr = swr_alloc_set_opts(NULL, av_get_default_channel_layout(channels), 
-					AV_SAMPLE_FMT_S16, freq / timeWarp, chLayout, (AVSampleFormat)avFrame->format, 
+					AV_SAMPLE_FMT_S16, freq, chLayout, (AVSampleFormat)avFrame->format, 
 					avFrame->sample_rate, 0, NULL);
 
 				FlogAssert(this->swr, "error allocating swr");
@@ -242,7 +265,7 @@ class CAudioHandler : public AudioHandler
 				FlogAssert(ret >= 0, "error allocating samples: " << ret);
 			}
 
-			int dstSampleCount = av_rescale_rnd(avFrame->nb_samples, freq / timeWarp, aCodecCtx->sample_rate, AV_ROUND_UP);
+			int dstSampleCount = av_rescale_rnd(avFrame->nb_samples, freq, aCodecCtx->sample_rate, AV_ROUND_UP);
 
 			int samplesConverted = swr_convert(swr, dstBuf, dstSampleCount, (const uint8_t**)avFrame->data, avFrame->nb_samples);
 			double ts = timeFromTs(av_frame_get_best_effort_timestamp(avFrame), stream->time_base);
