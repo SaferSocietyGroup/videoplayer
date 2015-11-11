@@ -32,28 +32,10 @@
 #include "avlibs.h"
 #include "Stream.h"
 #include "IAudioDevice.h"
+#include "VideoException.h"
 
 class Video;
 typedef std::shared_ptr<Video> VideoPtr;
-
-struct VideoException : public std::exception
-{
-	enum ErrorCode {
-		EFile,
-		EVideoCodec,
-		EStreamInfo,
-		EStream,
-		EDemuxing,
-		EDecodingVideo,
-		EDecodingAudio,
-		ESeeking,
-	};
-
-	ErrorCode errorCode;
-
-	std::string what();
-	VideoException(ErrorCode errorCode);
-};
 
 class Video
 {
@@ -77,26 +59,14 @@ class Video
 	virtual void play() = 0;
 	virtual int getWidth() = 0;
 	virtual int getHeight() = 0;
-	virtual int getDurationInFrames() = 0;
-	virtual int getReportedDurationInFrames() = 0;
-	virtual double getReportedDurationInSecs() = 0;
-	virtual double getDurationInSecs() = 0;
-	virtual float getFrameRate() = 0;
-	virtual float getReportedFrameRate() = 0;
+	virtual double getDuration() = 0;
 	virtual float getPAR() = 0;
 	virtual double getPosition() = 0;
 	virtual float getAspect() = 0;
-	virtual std::string getVideoCodecName() = 0;
-	virtual std::string getFormat() = 0;
-	virtual int getVideoBitRate() = 0;
 	virtual void setPlaybackSpeed(double speed) = 0;
 
-	virtual int getSampleRate() = 0;
-	virtual int getNumChannels() = 0;
-		
 	virtual void pause() = 0;
 	virtual bool getPaused() = 0;
-	virtual double getTime() = 0;
 		
 	virtual void SetVolume(float volume) = 0;
 	virtual void SetMute(bool mute) = 0;

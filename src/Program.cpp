@@ -76,10 +76,19 @@ class CProgram : public Program
 			rect.x = 0;
 			rect.y = (h - rect.h) / 2;
 		}
+
+		// SDL bug? If the overlay is exactly 320 x 240 and the output is exactly 640 x 480, the output is garbled.
+		if(overlay->w == 320 && rect.w == 640 && overlay->h == 240 && rect.h == 480){
+			rect.w++;
+		}
+
+		FlogD("new output size: " << rect.x << ", " << rect.y << ", " << rect.w << ", " << rect.h);
 	}
 
 	void HandleCommand(Command cmd)
 	{
+		FlogExpD(cmd.type);
+
 		switch(cmd.type){
 			case CTQuit:
 				done = true;
@@ -87,13 +96,11 @@ class CProgram : public Program
 				break;
 
 			case CTPlay:
-				audio->SetPaused(false);
 				if(video)
 					video->play();
 				break;
 
 			case CTPause:
-				audio->SetPaused(true);
 				if(video)
 					video->pause();
 				break;
@@ -138,8 +145,7 @@ class CProgram : public Program
 					}
 
 					if(video != 0){
-						FlogExpD(video->getReportedDurationInSecs());
-						cmdSend->SendCommand(CTDuration, video->getReportedDurationInSecs());
+						cmdSend->SendCommand(CTDuration, video->getDuration());
 					}
 						
 

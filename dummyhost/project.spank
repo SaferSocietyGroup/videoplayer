@@ -13,6 +13,8 @@ exclude           ../src/TimeHandler.cpp
 exclude           ../src/AudioHandler.cpp
 exclude           ../src/FileStream.cpp
 exclude           ../src/Stream.cpp
+exclude           ../src/Frame.cpp
+exclude           ../src/AudioHandlerNoSound.cpp
 
 lib-static        sdl
 ldflags           mconsole 
