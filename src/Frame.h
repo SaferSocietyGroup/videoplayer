@@ -28,6 +28,8 @@ class Frame
 	virtual FramePtr Clone() = 0;
 	virtual void AddSamples(const std::vector<Sample>& samples) = 0;
 	virtual const std::vector<Sample>& GetSamples() = 0;
+
+	virtual void CopyScaled(AVPicture* target, int w, int h, AVPixelFormat fmt) = 0;
 	
 	// create a frame from an existing avFrame
 	static FramePtr Create(AVFrame* avFrame, uint8_t* buffer, int64_t pts, bool shallowFree);

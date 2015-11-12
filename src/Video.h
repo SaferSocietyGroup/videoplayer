@@ -52,6 +52,7 @@ class Video
 	virtual int fetchAudio(int16_t* data, int nSamples) = 0;
 	virtual bool update() = 0;
 	virtual void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h) = 0;
+	virtual void updateBitmapBgr32(uint8_t* pixels, int w, int h) = 0;
 
 	virtual bool seek(double ts) = 0;
 	virtual bool step() = 0;

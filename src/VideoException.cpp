@@ -18,6 +18,7 @@ std::string VideoException::what()
 		"decoding video error",
 		"decoding audio error",
 		"seeking error",
+		"scaling error",
 		"exceeded maximum number of retries",
 	};
 
