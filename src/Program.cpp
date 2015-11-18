@@ -145,9 +145,8 @@ class CProgram : public Program
 					}
 
 					if(video != 0){
-						cmdSend->SendCommand(CTDuration, video->getDuration());
+						cmdSend->SendCommand(NO_SEQ_NUM, CTDuration, video->getDuration());
 					}
-						
 
 					if(overlay)
 						SDL_FreeYUVOverlay(overlay);
@@ -229,7 +228,7 @@ class CProgram : public Program
 				
 		handleMessage = [&](Video::MessageType type, const std::string& msg){
 			if(type == Video::MEof){
-				cmdSend->SendCommand(CTEof);
+				cmdSend->SendCommand(NO_SEQ_NUM, CTEof);
 			}
 		};
 
@@ -264,7 +263,7 @@ class CProgram : public Program
 						SDL_UnlockYUVOverlay(overlay);
 						redraw = true;
 
-						cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
+						cmdSend->SendCommand(NO_SEQ_NUM, CTPositionUpdate, video->getPosition());
 					}
 				}
 
@@ -349,7 +348,7 @@ class CProgram : public Program
 				std::wstring wmessage = Tools::StrToWstr(std::string(message));
 				std::wstring wfile = Tools::StrToWstr(std::string(file));
 				if(cmdSend != 0){
-					cmdSend->SendCommand(CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
+					cmdSend->SendCommand(NO_SEQ_NUM, CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
 				}
 			});
 

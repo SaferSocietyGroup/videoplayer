@@ -19,7 +19,7 @@ class CommandSender
 	public:
 	virtual void Start(PipePtr pipe) = 0;
 	virtual void SendCommand(Command& cmd) = 0;
-	virtual void SendCommand(CommandType type, ...) = 0;
+	virtual void SendCommand(uint32_t seqNum, CommandType type, ...) = 0;
 	virtual void WaitForConnection(int msTimeout) = 0;
 	virtual void Stop() = 0;
 

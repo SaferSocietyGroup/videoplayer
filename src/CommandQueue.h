@@ -8,6 +8,7 @@
 #include "Pipe.h"
 
 #define MAGIC 0xaabbaacc
+#define NO_SEQ_NUM 0
 
 typedef std::shared_ptr<class CommandQueue> CommandQueuePtr;
 
@@ -89,6 +90,7 @@ struct Command
 {
 	CommandType type;
 	std::vector<Argument> args;
+	uint32_t seqNum;
 };
 
 class CommandQueue

@@ -55,6 +55,8 @@ class CCommandSender : public CommandSender
 						pipe->WriteUInt32(MAGIC);
 						pipe->WriteUInt32((uint32_t)cmd.type);
 
+						pipe->WriteUInt32(cmd.seqNum);
+
 						int i = 0;
 
 						for(ArgumentType aType : CommandArgs[cmd.type]){
@@ -90,11 +92,12 @@ class CCommandSender : public CommandSender
 		pipe->WaitForConnection(msTimeout);
 	}
 	
-	void SendCommand(CommandType type, ...)
+	void SendCommand(uint32_t seqNum, CommandType type, ...)
 	{
 		Command cmd;
 
 		cmd.type = type;
+		cmd.seqNum = seqNum;
 
 		int i = 0;
 

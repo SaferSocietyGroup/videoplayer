@@ -50,6 +50,7 @@ class CCommandQueue : public CommandQueue
 					Command cmd;
 					
 					cmd.type = (CommandType)pipe->ReadUInt32();
+					cmd.seqNum = pipe->ReadUInt32();
 
 					if((uint32_t)cmd.type >= CTCmdCount)
 						throw CommandQueueException(Str("unknown command type: " << (uint32_t)cmd.type));
@@ -72,7 +73,6 @@ class CCommandQueue : public CommandQueue
 					if(magic != MAGIC)
 						throw CommandQueueException(Str("corrupt message (incorrect magic at end of message), cmd type: " << cmd.type << ", magic: " << std::hex << magic));
 
-					//std::lock_guard<std::mutex> lock(mutex);
 					mutex.lock();
 					queue.push(cmd);
 					mutex.unlock();
