@@ -68,6 +68,7 @@ class CCommandSender : public CommandSender
 								case ATInt32:  pipe->WriteInt32(cmd.args[i].i);    break;
 								case ATFloat:  pipe->WriteFloat(cmd.args[i].f);    break;
 								case ATDouble: pipe->WriteDouble(cmd.args[i].d);   break;
+								case ATBuffer: pipe->WriteBuffer(cmd.args[i].buf); break;
 							}
 
 							i++;
@@ -119,6 +120,7 @@ class CCommandSender : public CommandSender
 				case ATInt32:  arg.i = va_arg(vl, int);              break;
 				case ATFloat:  arg.f = va_arg(vl, double);           break;
 				case ATDouble: arg.d = va_arg(vl, double);           break;
+				case ATBuffer: throw CommandSenderException("not supported"); break;
 			}
 
 			cmd.args.push_back(arg);

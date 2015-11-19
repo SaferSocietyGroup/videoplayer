@@ -4,6 +4,10 @@
 #define MAGIC 0xaabbaacc
 #define NO_SEQ_NUM 0
 
+#include <vector>
+#include <cstdint>
+#include <string>
+
 enum CommandType
 {
 	CTQuit             = 0,
@@ -41,7 +45,7 @@ enum LoadType
 
 enum ArgumentType
 {
-	ATStr, ATInt32, ATFloat, ATDouble
+	ATStr, ATInt32, ATFloat, ATDouble, ATBuffer
 };
 
 struct CommandSpec
@@ -119,6 +123,7 @@ struct Argument
 
 	int32_t i;
 	std::wstring str;
+	std::vector<uint8_t> buf;
 	float f;
 	double d;
 };

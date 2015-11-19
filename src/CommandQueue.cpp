@@ -67,6 +67,7 @@ class CCommandQueue : public CommandQueue
 							case ATInt32:  arg.i = pipe->ReadInt32();  break;
 							case ATFloat:  arg.f = pipe->ReadFloat();  break;
 							case ATDouble: arg.d = pipe->ReadDouble(); break;
+							case ATBuffer: pipe->ReadBuffer(arg.buf);  break;
 						}
 						
 						cmd.args.push_back(arg);

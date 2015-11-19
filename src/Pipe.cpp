@@ -250,6 +250,19 @@ class CPipe : public Pipe
 		str = DecodeUTF8(buffer.data(), buffer.size());
 	}
 	
+	void WriteBuffer(const std::vector<uint8_t>& buffer)
+	{
+		WriteUInt32(buffer.size());
+		Write((const char*)buffer.data(), buffer.size());
+	}
+
+	void ReadBuffer(std::vector<uint8_t>& buffer)
+	{
+		uint32_t size = ReadUInt32();
+		buffer.resize(size);
+		Read((char*)&buffer[0], size);
+	}
+	
 	void Close()
 	{
 		if(pipe != INVALID_HANDLE_VALUE)
