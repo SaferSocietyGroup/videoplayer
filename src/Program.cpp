@@ -85,6 +85,37 @@ class CProgram : public Program
 		FlogD("new output size: " << rect.x << ", " << rect.y << ", " << rect.w << ", " << rect.h);
 	}
 
+	void SendBitmap(const Command& cmd)
+	{
+			if(video)
+			{
+				try
+				{
+					int w = cmd.args[0].i;
+					int h = cmd.args[1].i;
+
+					std::vector<uint8_t> buffer(w * h * 4);
+
+					video->updateBitmapBgr32(&buffer[0], w, h);
+
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1, w, h, buffer.size(), &buffer[0]);
+				}
+
+				catch(VideoException e)
+				{
+					// exception, report failure
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0, 0, (uint8_t*)0);
+					FlogE(e.what());
+				}
+			}
+
+			else
+			{
+				// no video, report failure
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0, 0, (uint8_t*)0);
+			}
+	}
+
 	void HandleCommand(Command cmd)
 	{
 		FlogExpD(cmd.type);
@@ -218,6 +249,10 @@ class CProgram : public Program
 			case CTSetQvMute:
 				if(video)
 					video->SetQvMute(cmd.args[0].i != 0);
+				break;
+
+			case CTGetBitmap:
+				SendBitmap(cmd);
 				break;
 
 			default:

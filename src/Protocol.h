@@ -29,6 +29,7 @@ enum CommandType
 	CTSetVolume        = 16,
 	CTSetMute          = 17,
 	CTSetQvMute        = 18,
+	CTGetBitmap        = 19,
 
 	CTCmdCount
 };
@@ -74,13 +75,13 @@ const std::vector<CommandSpec> CommandSpecs = {
 	// seek (seconds) -> ()
 	{ {ATFloat}, {}, true },
 
-	// load (loadtype, path) -> success?
+	// load (loadtype, path) -> (success?)
 	{ {ATInt32, ATStr}, {ATInt32}, true },
 
 	// unload -> ()
 	{ {}, {}, true },
 
-	// lfs connect (pipename) -> (success)?
+	// lfs connect (pipename) -> (success?)
 	{ {ATStr}, {ATInt32}, true },
 
 	// lfs disconnect
@@ -115,6 +116,9 @@ const std::vector<CommandSpec> CommandSpecs = {
 
 	// set quickviewmute (1/0)
 	{ {ATInt32}, {}, false },
+	
+	// get bitmap (w, h) -> (success?, w, h, xbgrBuffer)
+	{ {ATInt32, ATInt32}, {ATInt32, ATInt32, ATInt32, ATBuffer}, true },
 };
 
 struct Argument

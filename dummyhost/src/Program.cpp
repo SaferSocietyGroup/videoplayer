@@ -54,6 +54,14 @@ class CommandLine
 					// response for sent command
 					FlogD("reponse, seq: " << cmd.seqNum << ", type: " << cmd.type);
 				}
+
+				if((cmd.flags & CFResponse) != 0 && cmd.type == CTGetBitmap){
+					if(cmd.args[0].i == 1){
+						FlogD("got bitmap: " << cmd.args[1].i << "x" << cmd.args[2].i << " " << cmd.args[3].buf.size() << " bytes");
+					}else{
+						FlogE("failed to get a bitmap");
+					}
+				}
 			}
 
 			else{
@@ -86,6 +94,7 @@ class CommandLine
 				{"set-volume", CTSetVolume},
 				{"set-mute", CTSetMute},
 				{"set-qv-mute", CTSetQvMute},
+				{"get-bitmap", CTGetBitmap},
 			};
 
 			while(!done){
@@ -142,6 +151,7 @@ class CommandLine
 								case ATInt32:  arg.i = atoi(cmds[i].c_str());        break;
 								case ATFloat:  arg.f = atof(cmds[i].c_str());        break;
 								case ATDouble: arg.d = atof(cmds[i].c_str());        break;
+								case ATBuffer: FlogE("can't send a buffer from command line"); break;
 							}
 
 							cmd.args.push_back(arg);

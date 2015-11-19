@@ -120,7 +120,16 @@ class CCommandSender : public CommandSender
 				case ATInt32:  arg.i = va_arg(vl, int);              break;
 				case ATFloat:  arg.f = va_arg(vl, double);           break;
 				case ATDouble: arg.d = va_arg(vl, double);           break;
-				case ATBuffer: throw CommandSenderException("not supported"); break;
+				case ATBuffer:
+				{
+					// pop two arguments, size and buffer pointer
+					size_t size = va_arg(vl, int);
+					uint8_t* buffer = va_arg(vl, uint8_t*);
+
+					// treat buffer pointer as iterator, where buffer is the first element and buffer + size as one the last
+					arg.buf.assign(buffer, buffer + size);
+					break;
+				}
 			}
 
 			cmd.args.push_back(arg);
