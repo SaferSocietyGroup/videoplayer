@@ -101,6 +101,7 @@ class CCommandSender : public CommandSender
 
 		cmd.type = type;
 		cmd.seqNum = seqNum;
+		cmd.flags = flags;
 
 		int i = 0;
 

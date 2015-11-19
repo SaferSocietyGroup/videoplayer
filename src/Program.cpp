@@ -98,11 +98,15 @@ class CProgram : public Program
 			case CTPlay:
 				if(video)
 					video->play();
+
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTPause:
 				if(video)
 					video->pause();
+				
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTSeek:
@@ -116,6 +120,8 @@ class CProgram : public Program
 					{
 						FlogE(e.what());
 					}
+				
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				}
 				break;
 
@@ -142,9 +148,11 @@ class CProgram : public Program
 					{
 						FlogE("couldn't open video: " << e.what());
 						video = 0;
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0);
 					}
 
 					if(video != 0){
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1);
 						cmdSend->SendCommand(NO_SEQ_NUM, 0, CTDuration, video->getDuration());
 					}
 
@@ -165,10 +173,19 @@ class CProgram : public Program
 			case CTUnload:
 				video = 0;
 				audio->SetPaused(true);
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTLfsConnect:
-				lfs->Connect(cmd.args[0].str, 1000);
+				try {
+					lfs->Connect(cmd.args[0].str, 1000);
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1);
+				}
+
+				catch(StreamEx ex){
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0);
+					FlogE("could not connect to lfs: " << ex.what());
+				}
 				break;
 			
 			case CTLfsDisconnect:

@@ -22,8 +22,6 @@
 #include "StringTools.h"
 #include "Pipe.h"
 
-#define MAGIC 0xaabbaacc
-
 class CommandLine
 {
 	public:
@@ -49,9 +47,12 @@ class CommandLine
 						FlogD("eof");
 					}else if(cmd.type == CTLogMessage){
 						FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
-					}else{
-						FlogD("unknown command from player");
 					}
+				}
+
+				if((cmd.flags & CFResponse) != 0){
+					// response for sent command
+					FlogD("reponse, seq: " << cmd.seqNum << ", type: " << cmd.type);
 				}
 			}
 
