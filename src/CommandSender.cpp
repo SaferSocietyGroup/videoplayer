@@ -31,7 +31,7 @@ class CCommandSender : public CommandSender
 	void Start(PipePtr inPipe)
 	{
 		if(thread != nullptr)
-			throw CommandQueueException("command sender double start");
+			throw CommandSenderException("command sender double start");
 
 		this->pipe = inPipe;
 
@@ -56,10 +56,13 @@ class CCommandSender : public CommandSender
 						pipe->WriteUInt32((uint32_t)cmd.type);
 
 						pipe->WriteUInt32(cmd.seqNum);
+						pipe->WriteUInt32(cmd.flags);
 
 						int i = 0;
+		
+						auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
 
-						for(ArgumentType aType : CommandArgs[cmd.type]){
+						for(ArgumentType aType : argSpec){
 							switch(aType){
 								case ATStr:    pipe->WriteString(cmd.args[i].str); break;
 								case ATInt32:  pipe->WriteInt32(cmd.args[i].i);    break;
@@ -92,7 +95,7 @@ class CCommandSender : public CommandSender
 		pipe->WaitForConnection(msTimeout);
 	}
 	
-	void SendCommand(uint32_t seqNum, CommandType type, ...)
+	void SendCommand(uint32_t seqNum, uint32_t flags, CommandType type, ...)
 	{
 		Command cmd;
 
@@ -103,8 +106,10 @@ class CCommandSender : public CommandSender
 
 		va_list vl;
 		va_start(vl, type);
+					
+		auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
 
-		for(ArgumentType aType : CommandArgs[cmd.type]){
+		for(ArgumentType aType : argSpec){
 			Argument arg;
 			arg.type = aType;
 
@@ -130,8 +135,10 @@ class CCommandSender : public CommandSender
 		if(wasException)
 			throw CommandSenderException(Str("pipe threw exception: " << ex));
 
-		if(cmd.args.size() != CommandArgs[cmd.type].size())
-			throw CommandSenderException(Str("Command expects " << CommandArgs[cmd.type].size() << " args (not " << cmd.args.size()<< ")"));
+		auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
+
+		if(cmd.args.size() != argSpec.size())
+			throw CommandSenderException(Str("Command expects " << argSpec.size() << " args (not " << cmd.args.size()<< ")"));
 
 		{
 			std::lock_guard<std::mutex> lock(mutex);

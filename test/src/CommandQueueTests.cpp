@@ -37,6 +37,8 @@ class CCommandQueueTests : public CommandQueueTests
 		// stop
 		pipe->WriteUInt32(MAGIC);
 		pipe->WriteUInt32(CTQuit);
+		pipe->WriteUInt32(0);
+		pipe->WriteUInt32(0);
 		pipe->WriteUInt32(MAGIC);
 	}
 
@@ -59,33 +61,47 @@ class CCommandQueueTests : public CommandQueueTests
 			try {
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTPlay);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteUInt32(MAGIC);
 				
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTPause);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteUInt32(MAGIC);
 				
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTStop);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteUInt32(MAGIC);
 				
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTSeek);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteFloat(0.34f);
 				pipe->WriteUInt32(MAGIC);
 
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTLoad);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteInt32(0);
 				pipe->WriteString(L"name");
 				pipe->WriteUInt32(MAGIC);
 				
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTUnload);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteUInt32(MAGIC);
 				
 				pipe->WriteUInt32(MAGIC);
 				pipe->WriteUInt32(CTQuit);
+				pipe->WriteUInt32(0);
+				pipe->WriteUInt32(0);
 				pipe->WriteUInt32(MAGIC);
 			}
 
@@ -109,7 +125,9 @@ class CCommandQueueTests : public CommandQueueTests
 						TAssertEquals(c.type, type);
 					}
 
-					TAssertEquals(CommandArgs[(int)c.type].size(), c.args.size());
+					auto argTypes = CommandSpecs[(int)c.type].requestArgTypes;
+
+					TAssertEquals(argTypes.size(), c.args.size());
 
 					if(c.type == CTLoad){
 						TAssertEquals(c.args[0].i, 0);

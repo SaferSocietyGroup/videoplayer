@@ -108,7 +108,7 @@ class CommandLine
 					else if(cmds[0] == "seek-through"){
 						std::vector<float> positions = {1.0f, 3.0f, 10.0f, 20.0f, 23.0f, 23.5f, 30.0f, 70.0f};
 						for(auto pos : positions){
-							cmdSend->SendCommand(NO_SEQ_NUM, CTSeek, pos);
+							cmdSend->SendCommand(NO_SEQ_NUM, 0, CTSeek, pos);
 							SDL_Delay(500);
 						}
 					}
@@ -121,16 +121,18 @@ class CommandLine
 						Command cmd;
 						cmd.type = it->second;
 						cmd.seqNum = NO_SEQ_NUM;
-						
-						if(cmds.size() - 1 != CommandArgs[cmd.type].size())
-							throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd.type].size() << " args (not " << cmds.size() - 1 << ")"));
+
+						unsigned argsSize = CommandSpecs[cmd.type].requestArgTypes.size();
+
+						if(cmds.size() - 1 != argsSize)
+							throw std::runtime_error(Str(cmds[0] << " expects " << argsSize << " args (not " << cmds.size() - 1 << ")"));
 
 						if(cmd.type == CTQuit)
 							done = true;
 
 						int i = 1;
 
-						for(ArgumentType aType : CommandArgs[cmd.type]){
+						for(ArgumentType aType : CommandSpecs[cmd.type].requestArgTypes){
 							Argument arg;
 							arg.type = aType;
 
@@ -219,7 +221,7 @@ class CProgram : public Program
 					window = SDL_SetVideoMode(event.resize.w, event.resize.h, 0, SDL_RESIZABLE);
 					SDL_FillRect(window, 0, 0x3366aa);
 					SDL_Flip(window);
-					cmdSend->SendCommand(NO_SEQ_NUM, CTUpdateOutputSize, event.resize.w, event.resize.h);
+					cmdSend->SendCommand(NO_SEQ_NUM, 0, CTUpdateOutputSize, event.resize.w, event.resize.h);
 				}
 			}
 

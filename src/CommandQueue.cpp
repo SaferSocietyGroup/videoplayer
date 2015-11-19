@@ -50,12 +50,16 @@ class CCommandQueue : public CommandQueue
 					Command cmd;
 					
 					cmd.type = (CommandType)pipe->ReadUInt32();
-					cmd.seqNum = pipe->ReadUInt32();
 
 					if((uint32_t)cmd.type >= CTCmdCount)
 						throw CommandQueueException(Str("unknown command type: " << (uint32_t)cmd.type));
 
-					for(auto type : CommandArgs[cmd.type]){
+					cmd.seqNum = pipe->ReadUInt32();
+					cmd.flags = pipe->ReadUInt32();
+
+					auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
+
+					for(auto type : argSpec){
 						Argument arg;
 						
 						switch(type){
