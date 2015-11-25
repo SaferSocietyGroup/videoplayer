@@ -226,7 +226,7 @@ class CVideo : public Video
 		}
 
 		AVPicture pict;
-		int avret = avpicture_fill(&pict, pixels, PIX_FMT_BGR32, w, h);
+		int avret = avpicture_fill(&pict, pixels, PIX_FMT_RGB32, w, h);
 		
 		if(avret < 0){
 			FlogE("avpicture_fill returned " << avret);
