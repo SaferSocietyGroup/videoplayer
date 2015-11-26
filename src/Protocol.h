@@ -125,7 +125,7 @@ const std::vector<CommandSpec> CommandSpecs = {
 	// get dimensions () -> (success?, w, h)
 	{ {}, {ATInt32, ATInt32, ATInt32}, true },
 
-	// output position ()
+	// output position (x, y, w, h)
 	{ {ATInt32, ATInt32, ATInt32, ATInt32}, {}, false },
 };
 

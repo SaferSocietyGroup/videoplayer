@@ -225,15 +225,17 @@ class CVideo : public Video
 			throw VideoException(VideoException::EScaling);
 		}
 
+		AVPixelFormat fmt = PIX_FMT_RGB32;
+
 		AVPicture pict;
-		int avret = avpicture_fill(&pict, pixels, PIX_FMT_RGB32, w, h);
+		int avret = avpicture_fill(&pict, pixels, fmt, w, h);
 		
 		if(avret < 0){
 			FlogE("avpicture_fill returned " << avret);
 			throw VideoException(VideoException::EScaling);
 		}
 		
-		currentFrame->CopyScaled(&pict, w, h, PIX_FMT_BGR32);
+		currentFrame->CopyScaled(&pict, w, h, fmt);
 	}
 	
 	bool seekInternal(double t, int depth){
