@@ -82,6 +82,8 @@ class CProgram : public Program
 			rect.w++;
 		}
 
+		cmdSend->SendCommand(NO_SEQ_NUM, 0, CTOutputPosition, (int)rect.x, (int)rect.y, (int)rect.w, (int)rect.h);
+		
 		FlogD("new output size: " << rect.x << ", " << rect.y << ", " << rect.w << ", " << rect.h);
 	}
 
@@ -93,6 +95,12 @@ class CProgram : public Program
 				{
 					int w = cmd.args[0].i;
 					int h = cmd.args[1].i;
+
+					if(w == -1)
+						w = video->getWidth();
+
+					if(h == -1)
+						h = video->getHeight();
 
 					std::vector<uint8_t> buffer(w * h * 4);
 
@@ -253,6 +261,14 @@ class CProgram : public Program
 
 			case CTGetBitmap:
 				SendBitmap(cmd);
+				break;
+
+			case CTGetDimensions:
+				if(video){
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1, video->getWidth(), video->getHeight());
+				}else{
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0);
+				}
 				break;
 
 			default:

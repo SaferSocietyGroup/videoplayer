@@ -30,6 +30,8 @@ enum CommandType
 	CTSetMute          = 17,
 	CTSetQvMute        = 18,
 	CTGetBitmap        = 19,
+	CTGetDimensions    = 20,
+	CTOutputPosition   = 21,
 
 	CTCmdCount
 };
@@ -119,6 +121,12 @@ const std::vector<CommandSpec> CommandSpecs = {
 	
 	// get bitmap (w, h) -> (success?, w, h, xbgrBuffer)
 	{ {ATInt32, ATInt32}, {ATInt32, ATInt32, ATInt32, ATBuffer}, true },
+	
+	// get dimensions () -> (success?, w, h)
+	{ {}, {ATInt32, ATInt32, ATInt32}, true },
+
+	// output position ()
+	{ {ATInt32, ATInt32, ATInt32, ATInt32}, {}, false },
 };
 
 struct Argument

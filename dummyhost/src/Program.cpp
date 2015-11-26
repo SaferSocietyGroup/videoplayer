@@ -33,34 +33,68 @@ class CommandLine
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr cmdRecv;
 
+	void HandleResponse(const Command& cmd)
+	{
+		switch(cmd.type){
+			case CTGetBitmap:
+				if(cmd.args[0].i == 1){
+					FlogD("got bitmap: " << cmd.args[1].i << "x" << cmd.args[2].i << " " 
+						<< cmd.args[3].buf.size() << " bytes");
+				}else{
+					FlogE("failed to get a bitmap");
+				}
+				break;
+
+			case CTGetDimensions:
+				FlogD("got video dimensions: success: " 
+					<< cmd.args[0].i << ", " << cmd.args[1].i << " x " << cmd.args[2].i);
+				break;
+
+			default:
+				FlogW("unhandled reponse, seq: " << cmd.seqNum << ", type: " << cmd.type);
+				break;
+		}
+	}
+
+	void HandleCommand(const Command& cmd)
+	{
+		switch(cmd.type){
+			case CTPositionUpdate:
+				if(showMessages){
+					FlogD("position update: " << cmd.args[0].f);
+				}
+				break;
+			
+			case CTEof:
+				FlogD("eof");
+				break;
+		
+			case CTLogMessage:
+				if(showMessages){
+					FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
+				}
+				break;
+			
+			case CTOutputPosition:
+				FlogD("output position update: " << cmd.args[0].i << ", " 
+					<< cmd.args[1].i << ", " << cmd.args[2].i << ", " << cmd.args[3].i);
+				break;
+
+			default:
+				FlogW("unhandled command: " << (int)cmd.type);
+				break;
+		}
+	}
+
 	void RecvThread()
 	{
 		while(!done){
 			Command cmd;
 			if(cmdRecv->Dequeue(cmd)){
-				if(showMessages){
-					if(cmd.type == CTPositionUpdate){
-						FlogD("position update: " << cmd.args[0].f);
-					}else if(cmd.type == CTDuration){
-						FlogD("duration: " << cmd.args[0].f);
-					}else if(cmd.type == CTEof){
-						FlogD("eof");
-					}else if(cmd.type == CTLogMessage){
-						FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
-					}
-				}
-
 				if((cmd.flags & CFResponse) != 0){
-					// response for sent command
-					FlogD("reponse, seq: " << cmd.seqNum << ", type: " << cmd.type);
-				}
-
-				if((cmd.flags & CFResponse) != 0 && cmd.type == CTGetBitmap){
-					if(cmd.args[0].i == 1){
-						FlogD("got bitmap: " << cmd.args[1].i << "x" << cmd.args[2].i << " " << cmd.args[3].buf.size() << " bytes");
-					}else{
-						FlogE("failed to get a bitmap");
-					}
+					HandleResponse(cmd);
+				}else{
+					HandleCommand(cmd);
 				}
 			}
 
@@ -95,6 +129,7 @@ class CommandLine
 				{"set-mute", CTSetMute},
 				{"set-qv-mute", CTSetQvMute},
 				{"get-bitmap", CTGetBitmap},
+				{"get-dimensions", CTGetDimensions},
 			};
 
 			while(!done){
