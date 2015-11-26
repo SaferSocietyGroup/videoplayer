@@ -99,6 +99,8 @@ class CVideo : public Video
 
 	FramePtr fetchFrame()
 	{
+		bool wasStepIntoQueue = stepIntoQueue;
+
 		if(frameQueue.empty() && IsEof() && !reportedEof)
 		{
 			reportedEof = true;
@@ -130,8 +132,12 @@ class CVideo : public Video
 		if(poppedFrames > 1){
 			FlogD("skipped " << poppedFrames - 1 << " frames");
 		}
+
+		if(newFrame != 0){
+			FlogExpD(newFrame->GetPts());
+		}
 		
-		if(newFrame != 0 && (newFrame->GetPts() >= time || stepIntoQueue))
+		if(newFrame != 0 && (newFrame->GetPts() >= time || wasStepIntoQueue))
 			return newFrame;
 
 		return 0;
