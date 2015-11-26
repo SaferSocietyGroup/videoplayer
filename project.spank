@@ -3,14 +3,14 @@ target_platform	 mingw32
 name             SSG.VideoPlayer
 
 template         c++11
-cflags           ggdb
+cflags           ggdb D__MSVCRT_VERSION__=0x1000
 sourcedir        src
 cflags           std=c++0x Wall Wno-deprecated-declarations
 
 lib-static       libavdevice libavformat libavcodec libavfilter libswscale libswresample libavutil  sdl
 
 # link statically
-ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'"
+ldflags          static-libgcc "Wl,-Bstatic '$(tmpdir)/versioninfo.res'" lmsvcr100
 
 # generate version information for executable
 prebuildscript   "$(host_dash)windres -O coff -o '$(tmpdir)/versioninfo.res' res/versioninfo.rc"
