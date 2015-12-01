@@ -82,7 +82,46 @@ class CProgram : public Program
 			rect.w++;
 		}
 
+		cmdSend->SendCommand(NO_SEQ_NUM, 0, CTOutputPosition, (int)rect.x, (int)rect.y, (int)rect.w, (int)rect.h);
+		
 		FlogD("new output size: " << rect.x << ", " << rect.y << ", " << rect.w << ", " << rect.h);
+	}
+
+	void SendBitmap(const Command& cmd)
+	{
+			if(video)
+			{
+				try
+				{
+					int w = cmd.args[0].i;
+					int h = cmd.args[1].i;
+
+					if(w == -1)
+						w = video->getWidth();
+
+					if(h == -1)
+						h = video->getHeight();
+
+					std::vector<uint8_t> buffer(w * h * 4);
+
+					video->updateBitmapBgr32(&buffer[0], w, h);
+
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1, w, h, buffer.size(), &buffer[0]);
+				}
+
+				catch(VideoException e)
+				{
+					// exception, report failure
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0, 0, (uint8_t*)0);
+					FlogE(e.what());
+				}
+			}
+
+			else
+			{
+				// no video, report failure
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0, 0, (uint8_t*)0);
+			}
 	}
 
 	void HandleCommand(Command cmd)
@@ -98,11 +137,15 @@ class CProgram : public Program
 			case CTPlay:
 				if(video)
 					video->play();
+
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTPause:
 				if(video)
 					video->pause();
+				
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTSeek:
@@ -116,6 +159,8 @@ class CProgram : public Program
 					{
 						FlogE(e.what());
 					}
+				
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				}
 				break;
 
@@ -142,12 +187,13 @@ class CProgram : public Program
 					{
 						FlogE("couldn't open video: " << e.what());
 						video = 0;
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0);
 					}
 
 					if(video != 0){
-						cmdSend->SendCommand(CTDuration, video->getDuration());
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1);
+						cmdSend->SendCommand(NO_SEQ_NUM, 0, CTDuration, video->getDuration());
 					}
-						
 
 					if(overlay)
 						SDL_FreeYUVOverlay(overlay);
@@ -166,10 +212,19 @@ class CProgram : public Program
 			case CTUnload:
 				video = 0;
 				audio->SetPaused(true);
+				cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type);
 				break;
 
 			case CTLfsConnect:
-				lfs->Connect(cmd.args[0].str, 1000);
+				try {
+					lfs->Connect(cmd.args[0].str, 1000);
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1);
+				}
+
+				catch(StreamEx ex){
+					cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0);
+					FlogE("could not connect to lfs: " << ex.what());
+				}
 				break;
 			
 			case CTLfsDisconnect:
@@ -204,6 +259,18 @@ class CProgram : public Program
 					video->SetQvMute(cmd.args[0].i != 0);
 				break;
 
+			case CTGetBitmap:
+				SendBitmap(cmd);
+				break;
+
+			case CTGetDimensions:
+				if(video){
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 1, video->getWidth(), video->getHeight());
+				}else{
+						cmdSend->SendCommand(cmd.seqNum, CFResponse, cmd.type, 0, 0, 0);
+				}
+				break;
+
 			default:
 				throw std::runtime_error(Str("unknown command: " << (int)cmd.type));
 				break;
@@ -229,7 +296,7 @@ class CProgram : public Program
 				
 		handleMessage = [&](Video::MessageType type, const std::string& msg){
 			if(type == Video::MEof){
-				cmdSend->SendCommand(CTEof);
+				cmdSend->SendCommand(NO_SEQ_NUM, 0, CTEof);
 			}
 		};
 
@@ -264,7 +331,7 @@ class CProgram : public Program
 						SDL_UnlockYUVOverlay(overlay);
 						redraw = true;
 
-						cmdSend->SendCommand(CTPositionUpdate, video->getPosition());
+						cmdSend->SendCommand(NO_SEQ_NUM, 0, CTPositionUpdate, video->getPosition());
 					}
 				}
 
@@ -349,7 +416,7 @@ class CProgram : public Program
 				std::wstring wmessage = Tools::StrToWstr(std::string(message));
 				std::wstring wfile = Tools::StrToWstr(std::string(file));
 				if(cmdSend != 0){
-					cmdSend->SendCommand(CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
+					cmdSend->SendCommand(NO_SEQ_NUM, 0, CTLogMessage, (int)severity, lineNumber, wfile.c_str(), wmessage.c_str());
 				}
 			});
 

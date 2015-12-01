@@ -31,7 +31,7 @@ class CCommandSender : public CommandSender
 	void Start(PipePtr inPipe)
 	{
 		if(thread != nullptr)
-			throw CommandQueueException("command sender double start");
+			throw CommandSenderException("command sender double start");
 
 		this->pipe = inPipe;
 
@@ -55,14 +55,20 @@ class CCommandSender : public CommandSender
 						pipe->WriteUInt32(MAGIC);
 						pipe->WriteUInt32((uint32_t)cmd.type);
 
-						int i = 0;
+						pipe->WriteUInt32(cmd.seqNum);
+						pipe->WriteUInt32(cmd.flags);
 
-						for(ArgumentType aType : CommandArgs[cmd.type]){
+						int i = 0;
+		
+						auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
+
+						for(ArgumentType aType : argSpec){
 							switch(aType){
 								case ATStr:    pipe->WriteString(cmd.args[i].str); break;
 								case ATInt32:  pipe->WriteInt32(cmd.args[i].i);    break;
 								case ATFloat:  pipe->WriteFloat(cmd.args[i].f);    break;
 								case ATDouble: pipe->WriteDouble(cmd.args[i].d);   break;
+								case ATBuffer: pipe->WriteBuffer(cmd.args[i].buf); break;
 							}
 
 							i++;
@@ -90,18 +96,22 @@ class CCommandSender : public CommandSender
 		pipe->WaitForConnection(msTimeout);
 	}
 	
-	void SendCommand(CommandType type, ...)
+	void SendCommand(uint32_t seqNum, uint32_t flags, CommandType type, ...)
 	{
 		Command cmd;
 
 		cmd.type = type;
+		cmd.seqNum = seqNum;
+		cmd.flags = flags;
 
 		int i = 0;
 
 		va_list vl;
 		va_start(vl, type);
+					
+		auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
 
-		for(ArgumentType aType : CommandArgs[cmd.type]){
+		for(ArgumentType aType : argSpec){
 			Argument arg;
 			arg.type = aType;
 
@@ -110,6 +120,16 @@ class CCommandSender : public CommandSender
 				case ATInt32:  arg.i = va_arg(vl, int);              break;
 				case ATFloat:  arg.f = va_arg(vl, double);           break;
 				case ATDouble: arg.d = va_arg(vl, double);           break;
+				case ATBuffer:
+				{
+					// pop two arguments, size and buffer pointer
+					size_t size = va_arg(vl, int);
+					uint8_t* buffer = va_arg(vl, uint8_t*);
+
+					// treat buffer pointer as iterator, where buffer is the first element and buffer + size as one the last
+					arg.buf.assign(buffer, buffer + size);
+					break;
+				}
 			}
 
 			cmd.args.push_back(arg);
@@ -127,8 +147,10 @@ class CCommandSender : public CommandSender
 		if(wasException)
 			throw CommandSenderException(Str("pipe threw exception: " << ex));
 
-		if(cmd.args.size() != CommandArgs[cmd.type].size())
-			throw CommandSenderException(Str("Command expects " << CommandArgs[cmd.type].size() << " args (not " << cmd.args.size()<< ")"));
+		auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
+
+		if(cmd.args.size() != argSpec.size())
+			throw CommandSenderException(Str("Command expects " << argSpec.size() << " args (not " << cmd.args.size()<< ")"));
 
 		{
 			std::lock_guard<std::mutex> lock(mutex);

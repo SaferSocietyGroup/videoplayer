@@ -22,8 +22,6 @@
 #include "StringTools.h"
 #include "Pipe.h"
 
-#define MAGIC 0xaabbaacc
-
 class CommandLine
 {
 	public:
@@ -35,23 +33,68 @@ class CommandLine
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr cmdRecv;
 
+	void HandleResponse(const Command& cmd)
+	{
+		switch(cmd.type){
+			case CTGetBitmap:
+				if(cmd.args[0].i == 1){
+					FlogD("got bitmap: " << cmd.args[1].i << "x" << cmd.args[2].i << " " 
+						<< cmd.args[3].buf.size() << " bytes");
+				}else{
+					FlogE("failed to get a bitmap");
+				}
+				break;
+
+			case CTGetDimensions:
+				FlogD("got video dimensions: success: " 
+					<< cmd.args[0].i << ", " << cmd.args[1].i << " x " << cmd.args[2].i);
+				break;
+
+			default:
+				FlogW("unhandled reponse, seq: " << cmd.seqNum << ", type: " << cmd.type);
+				break;
+		}
+	}
+
+	void HandleCommand(const Command& cmd)
+	{
+		switch(cmd.type){
+			case CTPositionUpdate:
+				if(showMessages){
+					FlogD("position update: " << cmd.args[0].f);
+				}
+				break;
+			
+			case CTEof:
+				FlogD("eof");
+				break;
+		
+			case CTLogMessage:
+				if(showMessages){
+					FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
+				}
+				break;
+			
+			case CTOutputPosition:
+				FlogD("output position update: " << cmd.args[0].i << ", " 
+					<< cmd.args[1].i << ", " << cmd.args[2].i << ", " << cmd.args[3].i);
+				break;
+
+			default:
+				FlogW("unhandled command: " << (int)cmd.type);
+				break;
+		}
+	}
+
 	void RecvThread()
 	{
 		while(!done){
 			Command cmd;
 			if(cmdRecv->Dequeue(cmd)){
-				if(showMessages){
-					if(cmd.type == CTPositionUpdate){
-						FlogD("position update: " << cmd.args[0].f);
-					}else if(cmd.type == CTDuration){
-						FlogD("duration: " << cmd.args[0].f);
-					}else if(cmd.type == CTEof){
-						FlogD("eof");
-					}else if(cmd.type == CTLogMessage){
-						FlogD("log message (" << cmd.args[0].i << "): " << Tools::WstrToStr(cmd.args[3].str));
-					}else{
-						FlogD("unknown command from player");
-					}
+				if((cmd.flags & CFResponse) != 0){
+					HandleResponse(cmd);
+				}else{
+					HandleCommand(cmd);
 				}
 			}
 
@@ -85,6 +128,8 @@ class CommandLine
 				{"set-volume", CTSetVolume},
 				{"set-mute", CTSetMute},
 				{"set-qv-mute", CTSetQvMute},
+				{"get-bitmap", CTGetBitmap},
+				{"get-dimensions", CTGetDimensions},
 			};
 
 			while(!done){
@@ -108,7 +153,7 @@ class CommandLine
 					else if(cmds[0] == "seek-through"){
 						std::vector<float> positions = {1.0f, 3.0f, 10.0f, 20.0f, 23.0f, 23.5f, 30.0f, 70.0f};
 						for(auto pos : positions){
-							cmdSend->SendCommand(CTSeek, pos);
+							cmdSend->SendCommand(NO_SEQ_NUM, 0, CTSeek, pos);
 							SDL_Delay(500);
 						}
 					}
@@ -120,16 +165,19 @@ class CommandLine
 						
 						Command cmd;
 						cmd.type = it->second;
-						
-						if(cmds.size() - 1 != CommandArgs[cmd.type].size())
-							throw std::runtime_error(Str(cmds[0] << " expects " << CommandArgs[cmd.type].size() << " args (not " << cmds.size() - 1 << ")"));
+						cmd.seqNum = NO_SEQ_NUM;
+
+						unsigned argsSize = CommandSpecs[cmd.type].requestArgTypes.size();
+
+						if(cmds.size() - 1 != argsSize)
+							throw std::runtime_error(Str(cmds[0] << " expects " << argsSize << " args (not " << cmds.size() - 1 << ")"));
 
 						if(cmd.type == CTQuit)
 							done = true;
 
 						int i = 1;
 
-						for(ArgumentType aType : CommandArgs[cmd.type]){
+						for(ArgumentType aType : CommandSpecs[cmd.type].requestArgTypes){
 							Argument arg;
 							arg.type = aType;
 
@@ -138,6 +186,7 @@ class CommandLine
 								case ATInt32:  arg.i = atoi(cmds[i].c_str());        break;
 								case ATFloat:  arg.f = atof(cmds[i].c_str());        break;
 								case ATDouble: arg.d = atof(cmds[i].c_str());        break;
+								case ATBuffer: FlogE("can't send a buffer from command line"); break;
 							}
 
 							cmd.args.push_back(arg);
@@ -218,7 +267,7 @@ class CProgram : public Program
 					window = SDL_SetVideoMode(event.resize.w, event.resize.h, 0, SDL_RESIZABLE);
 					SDL_FillRect(window, 0, 0x3366aa);
 					SDL_Flip(window);
-					cmdSend->SendCommand(CTUpdateOutputSize, event.resize.w, event.resize.h);
+					cmdSend->SendCommand(NO_SEQ_NUM, 0, CTUpdateOutputSize, event.resize.w, event.resize.h);
 				}
 			}
 

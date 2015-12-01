@@ -11,6 +11,7 @@ struct VideoException : public std::exception
 		EDecodingVideo,
 		EDecodingAudio,
 		ESeeking,
+		EScaling,
 		ERetries,
 	};
 

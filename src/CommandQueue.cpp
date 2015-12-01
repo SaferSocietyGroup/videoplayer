@@ -54,7 +54,12 @@ class CCommandQueue : public CommandQueue
 					if((uint32_t)cmd.type >= CTCmdCount)
 						throw CommandQueueException(Str("unknown command type: " << (uint32_t)cmd.type));
 
-					for(auto type : CommandArgs[cmd.type]){
+					cmd.seqNum = pipe->ReadUInt32();
+					cmd.flags = pipe->ReadUInt32();
+
+					auto argSpec = (cmd.flags & CFResponse) != 0 ? CommandSpecs[cmd.type].responseArgTypes : CommandSpecs[cmd.type].requestArgTypes;
+
+					for(auto type : argSpec){
 						Argument arg;
 						
 						switch(type){
@@ -62,6 +67,7 @@ class CCommandQueue : public CommandQueue
 							case ATInt32:  arg.i = pipe->ReadInt32();  break;
 							case ATFloat:  arg.f = pipe->ReadFloat();  break;
 							case ATDouble: arg.d = pipe->ReadDouble(); break;
+							case ATBuffer: pipe->ReadBuffer(arg.buf);  break;
 						}
 						
 						cmd.args.push_back(arg);
@@ -72,7 +78,6 @@ class CCommandQueue : public CommandQueue
 					if(magic != MAGIC)
 						throw CommandQueueException(Str("corrupt message (incorrect magic at end of message), cmd type: " << cmd.type << ", magic: " << std::hex << magic));
 
-					//std::lock_guard<std::mutex> lock(mutex);
 					mutex.lock();
 					queue.push(cmd);
 					mutex.unlock();

@@ -99,6 +99,8 @@ class CVideo : public Video
 
 	FramePtr fetchFrame()
 	{
+		bool wasStepIntoQueue = stepIntoQueue;
+
 		if(frameQueue.empty() && IsEof() && !reportedEof)
 		{
 			reportedEof = true;
@@ -130,8 +132,12 @@ class CVideo : public Video
 		if(poppedFrames > 1){
 			FlogD("skipped " << poppedFrames - 1 << " frames");
 		}
+
+		if(newFrame != 0){
+			FlogExpD(newFrame->GetPts());
+		}
 		
-		if(newFrame != 0 && (newFrame->GetPts() >= time || stepIntoQueue))
+		if(newFrame != 0 && (newFrame->GetPts() >= time || wasStepIntoQueue))
 			return newFrame;
 
 		return 0;
@@ -194,17 +200,20 @@ class CVideo : public Video
 
 		return false;
 	}
-	
+
 	void updateOverlay(uint8_t** pixels, const uint16_t* pitches, int w, int h)
 	{
-		PixelFormat fffmt = AV_PIX_FMT_YUYV422;
-		AVPicture pict;
+		if(currentFrame == 0){
+			FlogE("Video::updateOverlay() called but currentFrame is unset");
+			throw VideoException(VideoException::EScaling);
+		}
 
-		int avret = avpicture_fill(&pict, NULL, fffmt, w, h);
+		AVPicture pict;
+		int avret = avpicture_fill(&pict, NULL, AV_PIX_FMT_YUYV422, w, h);
 
 		if(avret < 0){
 			FlogE("avpicture_fill returned " << avret);
-			throw std::runtime_error("avpicture_fill error");
+			throw VideoException(VideoException::EScaling);
 		}
 
 		for(int i = 0; i < 3; i++){
@@ -212,16 +221,27 @@ class CVideo : public Video
 			pict.linesize[i] = pitches[i];
 		}
 
-		struct SwsContext* swsCtx = sws_getContext(pCodecCtx->width, pCodecCtx->height, 
-				pCodecCtx->pix_fmt, w, h, fffmt, SWS_BILINEAR, NULL, NULL, NULL);
+		currentFrame->CopyScaled(&pict, w, h, AV_PIX_FMT_YUYV422);
+	}
 
-		if(swsCtx){
-			sws_scale(swsCtx, (uint8_t**)currentFrame->GetAvFrame()->data, currentFrame->GetAvFrame()->linesize, 0, 
-				pCodecCtx->height, pict.data, pict.linesize); 
-			sws_freeContext(swsCtx);
-		}else{
-			FlogE("Failed to get a scaling context");
+	void updateBitmapBgr32(uint8_t* pixels, int w, int h)
+	{
+		if(currentFrame == 0){
+			FlogE("Video::updateBitmapBgr32() called but currentFrame is unset");
+			throw VideoException(VideoException::EScaling);
 		}
+
+		AVPixelFormat fmt = PIX_FMT_RGB32;
+
+		AVPicture pict;
+		int avret = avpicture_fill(&pict, pixels, fmt, w, h);
+		
+		if(avret < 0){
+			FlogE("avpicture_fill returned " << avret);
+			throw VideoException(VideoException::EScaling);
+		}
+		
+		currentFrame->CopyScaled(&pict, w, h, fmt);
 	}
 	
 	bool seekInternal(double t, int depth){

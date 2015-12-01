@@ -4,6 +4,7 @@
 #include <string>
 #include <memory>
 #include <cstdint>
+#include <vector>
 
 typedef std::shared_ptr<class Pipe> PipePtr;
 
@@ -37,6 +38,9 @@ class Pipe
 
 	virtual void WriteString(const std::wstring& str) = 0;
 	virtual void ReadString(std::wstring& str) = 0;
+
+	virtual void WriteBuffer(const std::vector<uint8_t>& buffer) = 0;
+	virtual void ReadBuffer(std::vector<uint8_t>& buffer) = 0;
 
 	virtual void WaitForConnection(int msTimeout) = 0;
 
