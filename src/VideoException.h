@@ -1,3 +1,6 @@
+#ifndef VIDEO_EXCEPTION_H
+#define VIDEO_EXCEPTION_H
+
 #include <string>
 
 struct VideoException : public std::exception
@@ -20,3 +23,5 @@ struct VideoException : public std::exception
 	std::string what();
 	VideoException(ErrorCode errorCode);
 };
+
+#endif
