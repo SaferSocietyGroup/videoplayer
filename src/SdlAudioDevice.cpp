@@ -33,7 +33,7 @@ class CSdlAudioDevice : public SdlAudioDevice
 		}
 	}
 	
-	bool Init(int freq, int channels, std::function<int(int16_t* data, int nSamples)> update)
+	bool Init(int freq, int channels, int blockSize, std::function<int(int16_t* data, int nSamples)> update)
 	{
 		this->update = update;
 
@@ -45,7 +45,7 @@ class CSdlAudioDevice : public SdlAudioDevice
 		fmt.freq = freq;
 		fmt.format = AUDIO_S16LSB;
 		fmt.channels = channels;
-		fmt.samples = 1024;
+		fmt.samples = blockSize;
 		fmt.callback = SdlCallback;
 		fmt.userdata = this;
 
