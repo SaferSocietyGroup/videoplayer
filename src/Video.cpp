@@ -133,10 +133,6 @@ class CVideo : public Video
 			FlogD("skipped " << poppedFrames - 1 << " frames");
 		}
 
-		if(newFrame != 0){
-			FlogExpD(newFrame->GetPts());
-		}
-		
 		if(newFrame != 0 && (newFrame->GetPts() >= time || wasStepIntoQueue))
 			return newFrame;
 

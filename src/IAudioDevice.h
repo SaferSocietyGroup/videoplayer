@@ -8,6 +8,7 @@ typedef std::shared_ptr<class IAudioDevice> IAudioDevicePtr;
 
 class IAudioDevice {
 	public:
+	virtual bool Init(int freq, int channels, int blockSize, std::function<int(int16_t* data, int nSamples)> update) = 0;
 	virtual int GetRate() = 0;
 	virtual int GetBlockSize() = 0;
 	virtual int GetChannels() = 0;

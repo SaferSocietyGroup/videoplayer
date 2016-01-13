@@ -16,6 +16,7 @@
 #include "Video.h"
 #include "FileStream.h"
 #include "SdlAudioDevice.h"
+#include "DummyAudioDevice.h"
 #include "Lfscpp.h"
 
 class CProgram : public Program
@@ -27,7 +28,7 @@ class CProgram : public Program
 	
 	VideoPtr video;
 
-	SdlAudioDevicePtr audio;
+	IAudioDevicePtr audio;
 
 	bool done = false;
 	SDL_Overlay* overlay = 0;
@@ -36,6 +37,7 @@ class CProgram : public Program
 	int w = 640, h = 480;
 	
 	bool redraw = false;
+	int audioBlockSize = 1024;
 
 	CommandSenderPtr cmdSend;
 	CommandQueuePtr qCmd;
@@ -276,7 +278,7 @@ class CProgram : public Program
 				break;
 		}
 	}
-	
+
 	void Interface()
 	{
 		SDL_Init(SDL_INIT_EVERYTHING);
@@ -284,13 +286,21 @@ class CProgram : public Program
 		window = SDL_SetVideoMode(w, h, 0, 0);
 		FlogAssert(window, "could not set video mode");
 
-		audio = SdlAudioDevice::Create();
-		audio->Init(48000, 2, [&](int16_t* data, int nSamples) -> int {
-			if(video != 0) 
+		auto cb = [&](int16_t* data, int nSamples) -> int {
+			if(video != 0)
 				return video->fetchAudio(data, nSamples);
 
 			return 0;
-		});
+		};
+
+		audio = SdlAudioDevice::Create();
+
+		if(!audio->Init(48000, 2, audioBlockSize, cb))
+		{
+			// use dummy audio device if sdl audio failed to initialize
+			audio = DummyAudioDevice::Create();
+			audio->Init(48000, 2, audioBlockSize, cb);
+		}
 
 		SDL_Event event;
 				
@@ -368,6 +378,8 @@ class CProgram : public Program
 
 			arg->AddSwitchArg('p', "pipe-name", "PIPE_NAME", "Specify pipe to use for IPC.", [&](const std::string& arg){ pipeName = arg; });
 			arg->AddSwitchArg('w', "window-id", "WINDOW_ID", "Specify window ID to draw onto.", [&](const std::string& arg){ sWindowId = arg; });
+			arg->AddSwitchArg('b', "block-size", "AUDIO_BLOCK_SIZE", "Specify the audio block size (default: 1024)",
+				[&](const std::string& arg){ audioBlockSize = stoi(arg); });
 
 			std::vector<std::string> rest = arg->Parse(argc, argv);
 
