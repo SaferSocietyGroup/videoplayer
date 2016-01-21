@@ -240,12 +240,8 @@ class CVideo : public Video
 		currentFrame->CopyScaled(&pict, w, h, fmt);
 	}
 	
-	bool seekInternal(double t, int depth){
-		if(depth > 5){
-			FlogW("seeking failed, tried too many times");
-			return false;
-		}
-
+	bool seekInternal(double t, int depth)
+	{
 		ResetRetries();
 		emptyFrameQueue();
 		audioHandler->clearQueue();
@@ -254,9 +250,24 @@ class CVideo : public Video
 
 		double backSeek = (double)depth * 2.0f + 1.0f;
 
-		int64_t minTs = std::max(tsFromTime(t - backSeek - 2.5) + firstTs, (int64_t)0);
-		int64_t ts = std::max(tsFromTime(t - backSeek) + firstTs, (int64_t)0);
-		int64_t maxTs = std::max(tsFromTime(t - backSeek) + firstTs, (int64_t)0);
+		int64_t minTs = tsFromTime(t - backSeek - 2.5) + firstTs;
+		int64_t ts = tsFromTime(t - backSeek) + firstTs;
+		int64_t maxTs = tsFromTime(t - backSeek) + firstTs;
+
+		// There is no discernible way to determine if negative timestamps are allowed
+		// (or even required) to seek to low timestamps.
+		// On some files you must seek to negative timestamps to be able to seek to 0
+		// but on other files you get weird results from seeking to below 0.
+
+		// So, every other try, we will allow seeking to negative timestamps.
+
+		if((depth % 2) == 1){
+			minTs = std::max((int64_t)0, minTs);
+			ts = std::max((int64_t)0, minTs);
+			maxTs = std::max((int64_t)0, minTs);
+		}
+
+		FlogD("Trying to seek to minTs: " << minTs << " ts: " << ts << " maxTs: " << maxTs << " with firsTs: " << firstTs);
 
 		int flags = 0;
 		
@@ -272,7 +283,7 @@ class CVideo : public Video
 
 		avcodec_flush_buffers(pCodecCtx);
 
-		double newTime = t + timeFromTs(firstPts) - 1.0 / getFrameRate();
+		double newTime = t + timeFromTs(firstPts);
 		double actualTime = skipToTs(newTime);
 
 		// consider the seek failed and try again if the actual time diffs more than .5 seconds
@@ -280,9 +291,17 @@ class CVideo : public Video
 		
 		FlogD("wanted to seek to " << newTime << " and ended up at " << actualTime);
 
+		bool ret = true;
+
 		if(fabsf(newTime - actualTime) > .5){
-			FlogD("not good enough, trying again");
-			return seekInternal(t, depth + 1);
+			if(depth < 5){
+				FlogD("not good enough, trying again");
+				return seekInternal(t, depth + 1);
+			}
+			else{
+				ret = false;
+				FlogW("seek failed, wanted to seek to " << newTime << " and ended up at " << actualTime);
+			}
 		}
 
 		timeHandler->SetTime(actualTime);
@@ -291,7 +310,7 @@ class CVideo : public Video
 
 		audioHandler->onSeek();
 
-		return true;
+		return ret;
 	}
 
 	bool seek(double ts){
@@ -328,40 +347,36 @@ class CVideo : public Video
 		return seek(floorf(t * fps - 2.0));
 	}
 	
-	double skipToTs(double ts){
-		StreamFrameMap streamFrames;
-		streamFrames[videoStream] = Frame::CreateEmpty();
+	double skipToTs(double ts)
+	{
+		double ret = -1000000000.0;
 
-		double ret = -100000000000.0;
-
-		while(true)
-		{
-			try
-			{
-				bool frameDecoded = decodeFrame(streamFrames);
-				if(!frameDecoded)
-					throw VideoException(VideoException::EDecodingVideo);
-
-				if(streamFrames[videoStream]->finished != 0){
-					if(timeFromTs(streamFrames[videoStream]->GetPts()) >= ts){
-						ret = timeFromTs(streamFrames[videoStream]->GetPts());
-						break;
-					}
-
-					streamFrames[videoStream] = Frame::CreateEmpty();
-				}
+		for(int i = 0; i < 100; i++){
+			// "tick" the video, filling up the frame queue
+			tick(true);
+				
+			// throw away any frames below the requested time
+			double curr = .0;
+			while(frameQueue.GetContainer().size() > 0 && (curr = timeFromTs(frameQueue.GetContainer().at(0)->GetPts())) < ts){
+				ret = curr;
+				frameQueue.GetContainer().erase(frameQueue.GetContainer().begin());
 			}
 
-			catch(VideoException e)
-			{
-				Retry(Str("Exception in tick: " << e.what()));
-			}
+			// done if the frameQueue has a timestamp equal to or larger than the requested time
+			if(frameQueue.size() > 0 && timeFromTs(frameQueue.top()->GetPts()) >= ts)
+				break;
 		}
 
+		if(frameQueue.size() > 0){
+			// return the actual timestamp achieved
+			ret = timeFromTs(frameQueue.GetContainer().at(0)->GetPts());
+			audioHandler->discardQueueUntilTs(ret);
+		}
+		
 		return ret;
 	}
 
-	void tick(){
+	void tick(bool includeOldAudio = false){
 		bool success = false;
 
 		StreamFrameMap streamFrames;
@@ -396,7 +411,7 @@ class CVideo : public Video
 						// only enqueue audio that's newer than the current video time, 
 						// eg. on seeking we might encounter audio that's older than the frames in the frame queue.
 						if(streamFrames[audioStream]->GetSamples().size() > 0 && 
-							streamFrames[audioStream]->GetSamples()[0].ts >= timeHandler->GetTime())
+							(includeOldAudio || streamFrames[audioStream]->GetSamples()[0].ts >= timeHandler->GetTime()))
 						{
 							audioHandler->EnqueueAudio(streamFrames[audioStream]->GetSamples());
 						}else{
@@ -460,7 +475,7 @@ class CVideo : public Video
 		return ((float)w * getPAR()) / h;
 	}
 
-	double timeFromTs(uint64_t pts){
+	double timeFromTs(int64_t pts){
 		return (double)pts * av_q2d(pFormatCtx->streams[videoStream]->time_base);
 	}
 
@@ -555,16 +570,18 @@ class CVideo : public Video
 					// set timestamp and break out of loop
 					int64_t pts = av_frame_get_best_effort_timestamp(frame->GetAvFrame());
 
-					if(firstDts == AV_NOPTS_VALUE){
-						firstDts = frame->GetAvFrame()->pkt_dts;
-						FlogD("setting firstDts to: " << firstDts);
-					}
+					if(pair.first == videoStream){
+						if(firstDts == AV_NOPTS_VALUE){
+							firstDts = frame->GetAvFrame()->pkt_dts;
+							FlogD("setting firstDts to: " << firstDts);
+						}
 
-					if(firstPts == AV_NOPTS_VALUE){
-						firstPts = pts;
-						FlogD("setting firstPts to: " << firstPts);
+						if(firstPts == AV_NOPTS_VALUE){
+							firstPts = pts;
+							FlogD("setting firstPts to: " << firstPts);
+						}
 					}
-
+					
 					frame->SetPts(pts);
 					done = true;
 				}
@@ -706,7 +723,7 @@ class CVideo : public Video
 		maxFrameQueueSize = std::min(maxFrameQueueSize, 256);
 
 		// tick the video so that firstPts and firstDts are set
-		tick();
+		tick(true);
 	}
 
 	void closeFile(){
@@ -736,9 +753,25 @@ class CVideo : public Video
 		if(retryStack.size() > maxRetries){
 			FlogW("Maximum number of retries reached, they were spent on:");
 
+			int repeat = 0;
+			std::string lastStr = "";
+
 			for(auto str : retryStack){
-				FlogW(" * " << str);
+				if(lastStr == str){
+					repeat++;
+				}else{
+					if(repeat > 0)
+						FlogW("(repeats " << repeat << " times)");
+
+					FlogW(" * " << str);
+					repeat = 0;
+				}
+
+				lastStr = str;
 			}
+
+			if(repeat > 0)
+					FlogW("(repeats " << repeat << " times)");
 
 			throw VideoException(VideoException::ERetries);
 		}
