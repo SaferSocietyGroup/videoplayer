@@ -2,3 +2,6 @@
 	path = local-file-stream-client-native
 	url = https://github.com/NetClean/local-file-stream-client-native.git
 	pushurl = git@github.com:NetClean/local-file-stream-client-native.git
+[submodule "deps"]
+	path = deps
+	url = ssh://git@stash.intra.netclean.com:7999/an/videocontrolsubprocessdependencies.git
