@@ -18,4 +18,4 @@
 
 ## Building with Docker
     docker build -t vidbuild docker
-		docker run --rm -i -t -v $(pwd):/root/build/source vidbuild
+    docker run --rm -i -t -v $(pwd):/root/build/source vidbuild
