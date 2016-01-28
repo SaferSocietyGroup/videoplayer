@@ -11,11 +11,6 @@ set -e
 # set up build directory
 mkdir -p $BUILD_ROOT
 
-# clone and build spank
-git clone $SPANK_REPO $BUILD_ROOT/spank
-cd $BUILD_ROOT/spank
-./build.sh
-
 # make a copy of the source tree and build there
 # because strip fails in docker on windows (virtualbox shared folders)
 # https://www.virtualbox.org/ticket/8463
@@ -23,6 +18,11 @@ cd $BUILD_ROOT/spank
 cd $BUILD_ROOT
 cp -r source source-copy
 cd source-copy
+
+# clone and build spank
+git clone $SPANK_REPO $BUILD_ROOT/spank
+cd $BUILD_ROOT/spank
+./build.sh
 
 # build dependencies
 cd $BUILD_ROOT/source-copy/deps
