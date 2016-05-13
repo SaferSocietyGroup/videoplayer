@@ -1,8 +1,9 @@
 #include <cstdarg>
-#include <thread>
 #include <queue>
-#include <mutex>
 #include <SDL.h>
+
+#include "mingw.mutex.h"
+#include "mingw.thread.h"
 
 #include "CommandSender.h"
 #include "Pipe.h"

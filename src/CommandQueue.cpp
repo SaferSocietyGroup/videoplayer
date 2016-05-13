@@ -1,7 +1,8 @@
-#include <thread>
-#include <mutex>
 #include <queue>
 #include <iomanip>
+
+#include "mingw.mutex.h"
+#include "mingw.thread.h"
 
 #include "CommandQueue.h"
 #include "Pipe.h"
