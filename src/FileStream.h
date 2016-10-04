@@ -21,22 +21,20 @@
  * along with SSG VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef AVLIBS_H
-#define AVLIBS_H
+#ifndef FILESTREAM_H
+#define FILESTREAM_H
 
-#ifndef INT64_C
-#define INT64_C(c) (c ## LL)
-#define UINT64_C(c) (c ## ULL)
-#endif
+#include <memory>
 
-extern "C" {
+#include "Stream.h"
 
-#include <libavcodec/avcodec.h>
-#include <libavutil/mathematics.h>
-#include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libswresample/swresample.h>
+typedef std::shared_ptr<class FileStream> FileStreamPtr;
 
-}
+class FileStream : public Stream
+{
+	public:
+	virtual void Open(const std::string& filename, bool rw = false) = 0;
+	static FileStreamPtr Create();
+};
 
 #endif

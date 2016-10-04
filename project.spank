@@ -1,6 +1,6 @@
 [-common]
 target_platform	 mingw32
-name             NetCleanVideoPlayer
+name             SSG.VideoPlayer
 
 template         c++11
 cflags           ggdb
@@ -19,8 +19,8 @@ depends          local-file-stream-client-native:32bit-static
 
 [*debug: common]
 cflags           O0
-ldflags         mconsole 
+ldflags          mconsole 
 
 [release: common]
-cflags           O3
+cflags           O0
 postbuildscript  "$(host_dash)strip $(target)"

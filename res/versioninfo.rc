@@ -1,19 +1,19 @@
 1 VERSIONINFO
-FILEVERSION     1,0,1,7
-PRODUCTVERSION  1,0,1,7
+FILEVERSION     2,2,5,0
+PRODUCTVERSION  2,2,5,0
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
     BLOCK "080904E4"
     BEGIN
-      VALUE "CompanyName", "NetClean Technologies AB"
-      VALUE "FileDescription", "NetCleanVideoPlayerSubProcess"
-      VALUE "FileVersion", "1.0"
-      VALUE "InternalName", "NetCleanVideoPlayerSubProcess"
-      VALUE "LegalCopyright", "NetCleanVideoPlayerSubProcess"
-      VALUE "OriginalFilename", "NetCleanVideoPlayerSubProcess.exe"
-      VALUE "ProductName", "NetCleanVideoPlayerSubProcess"
-      VALUE "ProductVersion", "1.0"
+      VALUE "CompanyName", "Safer Society Group Sweden AB"
+      VALUE "FileDescription", "SSG.PlayerSubProcess"
+      VALUE "FileVersion", "2.1"
+      VALUE "InternalName", "SSG.VideoPlayerSubProcess"
+      VALUE "LegalCopyright", "SSG.VideoPlayerSubProcess"
+      VALUE "OriginalFilename", "SSG.VideoPlayerSubProcess.exe"
+      VALUE "ProductName", "SSG.VideoPlayerSubProcess"
+      VALUE "ProductVersion", "2.2"
     END
   END
 

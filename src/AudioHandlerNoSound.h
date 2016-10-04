@@ -21,22 +21,15 @@
  * along with SSG VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef AVLIBS_H
-#define AVLIBS_H
+#ifndef AUDIOHANDLERNOSOUND_H
+#define AUDIOHANDLERNOSOUND_H
 
-#ifndef INT64_C
-#define INT64_C(c) (c ## LL)
-#define UINT64_C(c) (c ## ULL)
-#endif
+#include "AudioHandler.h"
 
-extern "C" {
-
-#include <libavcodec/avcodec.h>
-#include <libavutil/mathematics.h>
-#include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libswresample/swresample.h>
-
-}
+class AudioHandlerNoSound : public AudioHandler
+{
+	public:
+	static AudioHandlerPtr Create(IAudioDevicePtr device, TimeHandlerPtr timeHandler); 
+};
 
 #endif

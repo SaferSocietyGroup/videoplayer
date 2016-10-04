@@ -21,22 +21,28 @@
  * along with SSG VideoPlayer.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef AVLIBS_H
-#define AVLIBS_H
+#ifndef TIMEHANDLER_H
+#define TIMEHANDLER_H
 
-#ifndef INT64_C
-#define INT64_C(c) (c ## LL)
-#define UINT64_C(c) (c ## ULL)
-#endif
+#include <memory>
 
-extern "C" {
+#include "IAudioDevice.h"
 
-#include <libavcodec/avcodec.h>
-#include <libavutil/mathematics.h>
-#include <libswscale/swscale.h>
-#include <libavformat/avformat.h>
-#include <libswresample/swresample.h>
+typedef std::shared_ptr<class TimeHandler> TimeHandlerPtr;
 
-}
+class TimeHandler
+{
+	public:
+	virtual double GetTime() = 0;
+	virtual double GetTimeWarp() = 0;
+	virtual void Pause() = 0;
+	virtual void Play() = 0;
+	virtual bool GetPaused() = 0;
+	virtual void SetTimeWarp(double tps) = 0;
+	virtual void SetTime(double t) = 0;
+	virtual void AddTime(double t) = 0;
+
+	static TimeHandlerPtr Create(IAudioDevicePtr audioDevice);
+};
 
 #endif
