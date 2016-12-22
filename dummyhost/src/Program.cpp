@@ -1,6 +1,5 @@
 #include <iostream>
 #include <cstdint>
-#include <thread>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -13,6 +12,7 @@
 
 #define WIN32_LEAN_AND_MEAN
 #include "windows.h"
+#include "mingw.thread.h"
 
 #include "Program.h"
 #include "ArgParser.h"
