@@ -1,8 +1,9 @@
 #include <memory>
-#include <thread>
 #include <chrono>
-#include <mutex>
 #include <map>
+
+#include "mingw.mutex.h"
+#include "mingw.thread.h"
 
 #include "DummyAudioDevice.h"
 #include "Flog.h"

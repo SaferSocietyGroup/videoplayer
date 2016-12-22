@@ -1,2 +1,0 @@
-There need to be at least oine file in content or lib for the package to install correctly.
-Adding a textfile to the lib folder will however not add a reference.
