@@ -1,8 +1,6 @@
 #!/bin/bash
 BUILD_ROOT=/root/build
 
-SPANK_REPO=https://github.com/noname22/spank.git
-
 ARTIFACTS="SSG.VideoPlayer.exe"
 
 set -e
